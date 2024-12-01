@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试页面</title>
+    <style>
+        /* 重置特定容器内的样式 */
+        .quote-page-container {
+            all: initial;
+            /* 确保容器占满整个视口 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            /* 基础样式 */
+            background-color: #1a1a1a;
+            color: rgba(255, 255, 255, 1);
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            z-index: 9999;
+            transition: all 0.3s ease;
+        }
+
+        /* 亮色主题样式 */
+        .quote-page-container.light-theme {
+            background-color: #f5f5f5;
+            color: rgba(0, 0, 0, 0.7);
+        }
+
+        /* 所有样式都限定在容器内 */
+        .quote-page-container .welcome-text {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .quote-page-container h1 {
+            font-size: 3em;
+            font-weight: 400;
+        }
+
+        .quote-page-container p {
+            font-size: 1em;
+            font-weight: 400;
+            opacity: 0.5;
+        }
+
+        .quote-page-container button {
+            margin-top: 2em;
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: #ffffff16;
+            color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: fit-content;
+        }
+
+        .quote-page-container button:hover {
+            background-color: #ffffff2e;
+        }
+
+        .quote-page-container button:active {
+            background-color: #ffffff2b;
+            transform: scale(0.95);
+        }
+
+        /* 调整亮色主题下的按钮样式 */
+        .quote-page-container.light-theme button {
+            background-color: #00000016;
+            color: rgba(0, 0, 0, 0.749);
+        }
+
+        .quote-page-container.light-theme button:hover {
+            background-color: #0000002e;
+        }
+
+        .quote-page-container.light-theme button:active {
+            background-color: #0000002b;
+        }
+
+        /* 文字按钮样式 */
+        .text-button {
+            margin-top: 20px !important;
+            padding: 5px 10px !important;
+            font-size: 1em !important;
+            background-color: transparent !important;
+            color: rgba(255, 255, 255, 0.4) !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: all 0.3s !important;
+            display: block !important;
+        }
+
+        .text-button:hover {
+            color: rgba(255, 255, 255, 0.6) !important;
+            background-color: transparent !important;
+        }
+
+        /* 亮色主题下的文字按钮样式 */
+        .quote-page-container.light-theme .text-button {
+            color: rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .quote-page-container.light-theme .text-button:hover {
+            color: rgba(0, 0, 0, 0.6) !important;
+        }
+
+        /* 日期样式 - 调整数字和文字的一致性 */
+        .quote-page-container #date {
+            font-size: 1.5em;
+            font-weight: 400;
+            opacity: 0.5;
+            margin-bottom: 0.2em;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 时间样式 - 突出显示 */
+        .quote-page-container #time {
+            font-size: 8em;
+            font-weight: 300;
+            opacity: 0.6;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        /* 亮色主题下的特殊调整 */
+        .quote-page-container.light-theme #date {
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="quote-page-container" id="container">
+        <div class="welcome-text">
+            <h1 id="date"></h1>
+            <h1 id="time"></h1>
+            <script>
+                function updateDateTime() {
+                    const now = new Date();
+                    // 日期格式化
+                    const dateOptions = {
+                        year: 'numeric',
+                        month: 'numeric',
+                        day: 'numeric'
+                    };
+                    const dateStr = now.toLocaleDateString('zh-CN', dateOptions)
+                        .replace('/', '年')
+                        .replace('/', '月') + '日';
+                    
+                    // 时间格式化
+                    const timeOptions = {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    };
+                    const timeStr = now.toLocaleTimeString('zh-CN', timeOptions);
+                    
+                    document.getElementById('date').textContent = dateStr;
+                    document.getElementById('time').textContent = timeStr;
+                }
+                updateDateTime();
+                setInterval(updateDateTime, 1000);
+            </script>
+            <button onclick="location.reload()">刷新页面</button>
+            <button class="text-button" onclick="toggleTheme()">切换主题</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const container = document.getElementById('container');
+            container.classList.toggle('light-theme');
+            
+            // 保存主题偏好到本地存储
+            const isLight = container.classList.contains('light-theme');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // 页面加载时恢复上次的主题设置
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.getElementById('container').classList.add('light-theme');
+            }
+        });
+    </script>
+</body>
+</html>
