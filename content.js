@@ -6,6 +6,7 @@ class QuickTap {
         this.contextMenu = null;
         this.editModal = null;
         this.currentAppIndex = null;
+        this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false };
         this.init();
 
         // Make instance available globally for error handling
@@ -13,6 +14,13 @@ class QuickTap {
     }
 
     init() {
+        // Load shortcut settings
+        chrome.storage.sync.get(['shortcut'], (result) => {
+            if (result.shortcut) {
+                this.shortcut = result.shortcut;
+            }
+        });
+
         // Create popup container
         this.popup = document.createElement('div');
         this.popup.className = 'quicktap-popup';
@@ -26,6 +34,21 @@ class QuickTap {
             </div>
         `;
 
+        // Add popup to document
+        document.body.appendChild(this.popup);
+
+        // Add keyboard event listener
+        document.addEventListener('keydown', (e) => {
+            // Check if the pressed keys match the shortcut
+            if (e.key.toLowerCase() === this.shortcut.key &&
+                e.ctrlKey === this.shortcut.ctrl &&
+                e.altKey === this.shortcut.alt &&
+                e.shiftKey === this.shortcut.shift) {
+                e.preventDefault();
+                this.togglePopup();
+            }
+        });
+
         // Create context menu
         this.contextMenu = document.createElement('div');
         this.contextMenu.className = 'context-menu';
@@ -38,6 +61,9 @@ class QuickTap {
                 <span>🗑️ Delete</span>
             </div>
         `;
+
+        // Add context menu to document
+        document.body.appendChild(this.contextMenu);
 
         // Create edit modal
         this.editModal = document.createElement('div');
@@ -55,6 +81,9 @@ class QuickTap {
                 <button class="save-btn">Save</button>
             </div>
         `;
+
+        // Add edit modal to document
+        document.body.appendChild(this.editModal);
 
         // Add event listeners
         this.searchBox = this.popup.querySelector('.quicktap-search');
@@ -78,11 +107,6 @@ class QuickTap {
             }
         });
 
-        // Add to page
-        document.body.appendChild(this.popup);
-        document.body.appendChild(this.contextMenu);
-        document.body.appendChild(this.editModal);
-        
         // Load saved apps
         this.loadApps();
     }
@@ -295,17 +319,25 @@ class QuickTap {
             }
         }
     }
+
+    togglePopup() {
+        this.popup.classList.toggle('visible');
+        if (this.popup.classList.contains('visible')) {
+            this.searchBox.focus();
+        }
+    }
 }
 
-// Initialize when the extension sends a message
+// Initialize QuickTap when the page loads
+if (!window.quickTap) {
+    window.quickTap = new QuickTap();
+}
+
+// Handle extension messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'toggle') {
-        if (!window.quickTap) {
-            window.quickTap = new QuickTap();
-        }
-        window.quickTap.popup.classList.toggle('visible');
-        if (window.quickTap.popup.classList.contains('visible')) {
-            window.quickTap.searchBox.focus();
+        if (window.quickTap) {
+            window.quickTap.togglePopup();
         }
     }
 });

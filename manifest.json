@@ -9,6 +9,7 @@
     "scripting",
     "tabs"
   ],
+  "options_page": "options.html",
   "host_permissions": [
     "https://translate.googleapis.com/*"
   ],
