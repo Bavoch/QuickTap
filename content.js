@@ -7,6 +7,7 @@ class QuickTap {
         this.editModal = null;
         this.currentAppIndex = null;
         this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false };
+        this.isDragging = false; // 新增属性
         this.init();
 
         // Make instance available globally for error handling
@@ -117,6 +118,7 @@ class QuickTap {
         container.className = 'app-icon';
         container.title = app.title;
         container.dataset.index = index;
+        container.draggable = true; // 启用拖拽
 
         const img = document.createElement('img');
         img.alt = app.title;
@@ -124,23 +126,125 @@ class QuickTap {
         img.src = app.favicon;
 
         container.appendChild(img);
+
+        // 阻止链接的默认点击行为，只在非拖拽时跳转
+        container.addEventListener('click', (e) => {
+            if (!this.isDragging) {
+                chrome.runtime.sendMessage({ action: 'openUrl', url: app.url });
+                this.togglePopup();
+            }
+            e.preventDefault();
+        });
+
+        // 右键菜单
         container.addEventListener('contextmenu', (e) => {
             this.showContextMenu(e, index);
         });
 
+        // 拖拽事件
+        container.addEventListener('dragstart', (e) => {
+            this.isDragging = true;
+            container.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', index);
+            // 设置拖动时的半透明效果
+            setTimeout(() => {
+                container.style.opacity = '0.5';
+            }, 0);
+        });
+
+        container.addEventListener('dragend', (e) => {
+            this.isDragging = false;
+            container.classList.remove('dragging');
+            container.style.opacity = '1';
+            // 移除所有图标的dragover效果
+            const icons = this.popup.querySelectorAll('.app-icon');
+            icons.forEach(icon => icon.classList.remove('drag-over'));
+        });
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.classList.add('drag-over');
+        });
+
+        container.addEventListener('dragleave', (e) => {
+            container.classList.remove('drag-over');
+        });
+
+        container.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            container.classList.remove('drag-over');
+            
+            const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const toIndex = parseInt(container.dataset.index);
+            
+            if (fromIndex !== toIndex) {
+                // 获取当前应用列表
+                const apps = await this.getApps();
+                
+                // 移动数组元素
+                const [movedApp] = apps.splice(fromIndex, 1);
+                apps.splice(toIndex, 0, movedApp);
+                
+                // 保存新顺序
+                await chrome.storage.sync.set({ apps });
+                
+                // 重新加载应用列表
+                this.loadApps();
+            }
+        });
+
         return container;
+    }
+
+    async loadApps() {
+        const apps = await this.getApps();
+        const appList = this.popup.querySelector('.app-list');
+        appList.innerHTML = '';
+        
+        // 添加拖拽事件到应用列表容器
+        appList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const draggingElement = this.popup.querySelector('.dragging');
+            if (draggingElement) {
+                const afterElement = this.getDragAfterElement(appList, e.clientX);
+                if (afterElement) {
+                    appList.insertBefore(draggingElement, afterElement);
+                } else {
+                    appList.appendChild(draggingElement);
+                }
+            }
+        });
+        
+        apps.forEach((app, index) => {
+            appList.appendChild(this.createAppIcon(app, index));
+        });
+    }
+
+    // 辅助函数：确定拖拽元素应该放在哪个元素之后
+    getDragAfterElement(container, x) {
+        const draggableElements = [...container.querySelectorAll('.app-icon:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = x - box.left - box.width / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     async handleSearch(event) {
         if (event.key === 'Enter') {
             const query = this.searchBox.value.trim();
             if (event.ctrlKey) {
-                // Auto-complete URL and visit
-                let url = query;
-                if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://' + url;
-                }
-                window.location.href = url;
+                // 自动补全URL并访问
+                const url = this.autoCompleteUrl(query);
+                chrome.runtime.sendMessage({ action: 'openUrl', url: url });
+                this.searchBox.value = ''; 
+                this.togglePopup();
             } else if (event.shiftKey) {
                 // Translate
                 const translatedText = await this.translate(query);
@@ -148,9 +252,64 @@ class QuickTap {
                 this.searchBox.select();
             } else {
                 // Google search
-                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                chrome.runtime.sendMessage({ action: 'openUrl', url: searchUrl });
+                this.searchBox.value = ''; 
+                this.togglePopup();
             }
         }
+    }
+
+    autoCompleteUrl(input) {
+        // 移除开头和结尾的空格
+        input = input.trim().toLowerCase();
+        
+        // 如果已经是完整的URL，直接返回
+        if (input.startsWith('http://') || input.startsWith('https://')) {
+            return input;
+        }
+
+        // 常见网站的特殊处理
+        const commonSites = {
+            'google': 'www.google.com',
+            'gmail': 'mail.google.com',
+            'youtube': 'www.youtube.com',
+            'facebook': 'www.facebook.com',
+            'twitter': 'twitter.com',
+            'x': 'twitter.com',
+            'instagram': 'www.instagram.com',
+            'linkedin': 'www.linkedin.com',
+            'github': 'github.com',
+            'reddit': 'www.reddit.com',
+            'amazon': 'www.amazon.com',
+            'netflix': 'www.netflix.com',
+            'spotify': 'www.spotify.com',
+            'microsoft': 'www.microsoft.com',
+            'apple': 'www.apple.com',
+            'yahoo': 'www.yahoo.com',
+            'bing': 'www.bing.com',
+            'wikipedia': 'www.wikipedia.org',
+            'baidu': 'www.baidu.com',
+            'bilibili': 'www.bilibili.com',
+            'zhihu': 'www.zhihu.com',
+            'taobao': 'www.taobao.com',
+            'tmall': 'www.tmall.com',
+            'jd': 'www.jd.com',
+            'weibo': 'www.weibo.com'
+        };
+
+        // 检查是否是常见网站
+        if (commonSites[input]) {
+            return 'https://' + commonSites[input];
+        }
+
+        // 处理已经包含域名的情况
+        if (input.includes('.')) {
+            return 'https://' + (input.startsWith('www.') ? input : 'www.' + input);
+        }
+
+        // 默认添加.com后缀
+        return 'https://www.' + input + '.com';
     }
 
     async translate(text) {
@@ -191,9 +350,76 @@ class QuickTap {
     }
 
     getFavicon() {
-        const favicon = document.querySelector('link[rel="icon"]') || 
-                       document.querySelector('link[rel="shortcut icon"]');
-        return favicon ? favicon.href : 'https://www.google.com/s2/favicons?domain=' + window.location.hostname;
+        // 收集所有可能的图标
+        const icons = [];
+        
+        // 检查所有图标相关的链接
+        const iconSelectors = [
+            'link[rel="icon"][sizes]',
+            'link[rel="shortcut icon"][sizes]',
+            'link[rel="apple-touch-icon"][sizes]',
+            'link[rel="apple-touch-icon-precomposed"][sizes]',
+            'meta[name="msapplication-TileImage"]',
+            'link[rel="fluid-icon"]',
+            'link[rel="mask-icon"]',
+            // 没有指定尺寸的图标
+            'link[rel="icon"]:not([sizes])',
+            'link[rel="shortcut icon"]:not([sizes])',
+            'link[rel="apple-touch-icon"]:not([sizes])',
+            'link[rel="apple-touch-icon-precomposed"]:not([sizes])'
+        ];
+
+        // 获取所有图标元素
+        iconSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                let iconUrl;
+                let size = 0;
+
+                // 获取图标URL
+                if (element.tagName.toLowerCase() === 'link') {
+                    iconUrl = element.href;
+                } else if (element.tagName.toLowerCase() === 'meta') {
+                    iconUrl = element.content;
+                }
+
+                // 获取图标尺寸
+                const sizes = element.getAttribute('sizes');
+                if (sizes) {
+                    // 处理类似 "32x32" 或 "any" 的尺寸
+                    const match = sizes.match(/(\d+)x(\d+)/);
+                    if (match) {
+                        size = parseInt(match[1]);
+                    } else if (sizes === 'any') {
+                        size = 192; // 假设 "any" 是大图标
+                    }
+                } else {
+                    // 对于没有指定尺寸的图标，根据类型赋予默认尺寸
+                    if (element.rel) {
+                        if (element.rel.includes('apple-touch-icon')) {
+                            size = 180; // apple-touch-icon 通常是180x180
+                        } else {
+                            size = 32; // 普通 favicon 通常是32x32
+                        }
+                    }
+                }
+
+                if (iconUrl) {
+                    icons.push({ url: iconUrl, size: size });
+                }
+            });
+        });
+
+        // 如果找到了图标，返回尺寸最大的那个
+        if (icons.length > 0) {
+            // 按尺寸降序排序
+            icons.sort((a, b) => b.size - a.size);
+            return icons[0].url;
+        }
+
+        // 如果没有找到任何图标，使用 Google 的 favicon 服务作为后备
+        // 请求最大尺寸的图标 (128px)
+        return 'https://www.google.com/s2/favicons?sz=128&domain=' + window.location.hostname;
     }
 
     showContextMenu(e, index) {
@@ -272,16 +498,6 @@ class QuickTap {
             chrome.storage.sync.get(['apps'], (result) => {
                 resolve(result.apps || []);
             });
-        });
-    }
-
-    async loadApps() {
-        const apps = await this.getApps();
-        const appList = this.popup.querySelector('.app-list');
-        appList.innerHTML = '';
-        
-        apps.forEach((app, index) => {
-            appList.appendChild(this.createAppIcon(app, index));
         });
     }
 

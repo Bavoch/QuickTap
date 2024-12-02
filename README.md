@@ -1,43 +1,42 @@
-# QuickTap Chrome Extension
+# QuickTap Chrome 扩展程序
 
-A Chrome extension for quick search, translation, and website access.
+一个用于快速搜索、翻译和访问网站的 Chrome 扩展程序。
 
-## Features
+## 功能
 
-- Middle-screen popup with search box and application list
-- Quick search with Google
-- URL auto-completion and direct visit
-- Translation feature (requires API integration)
-- Save and access your favorite websites
+- 屏幕中间弹窗，包含搜索框和应用列表
+- Google 快速搜索
+- URL 自动补全和直接访问
+- 翻译功能（需要 API 集成）
+- 保存并访问您喜爱的网站
 
-## Keyboard Shortcuts
+## 键盘快捷键
 
-- `Enter`: Perform Google search
-- `Ctrl + Enter`: Auto-complete and visit URL
-- `Shift + Enter`: Translate text
+- `Enter`: 执行 Google 搜索
+- `Ctrl + Enter`: 自动补全并访问 URL
+- `Shift + Enter`: 翻译文本
 
-## Installation
+## 安装
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode" in the top right
-3. Click "Load unpacked" and select the QuickTap directory
-4. The extension icon should appear in your Chrome toolbar
+1. 打开 Chrome 并进入 `chrome://extensions/`
+2. 在右上角启用“开发者模式”
+3. 点击“加载已解压的扩展程序”并选择 QuickTap 目录
+4. 扩展程序图标应出现在您的 Chrome 工具栏中
 
-## Usage
+## 使用
 
-1. Click the QuickTap icon in your Chrome toolbar to open the popup
-2. Type in the search box:
-   - For search: Enter text and press Enter
-   - For URL: Enter website address and press Ctrl+Enter
-   - For translation: Enter text and press Shift+Enter
-3. Click the "+" button to add the current website to your quick access list
+1. 点击 Chrome 工具栏中的 QuickTap 图标以打开弹窗
+2. 在搜索框中输入：
+   - 搜索：输入文本并按 Enter
+   - URL：输入网站地址并按 Ctrl+Enter
+   - 翻译：输入文本并按 Shift+Enter
+3. 点击“+”按钮将当前网站添加到快速访问列表
 
-## Development
+## 开发
 
-To modify the extension:
-1. Edit the source files
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the extension card
-4. Test your changes
+要修改扩展程序：
+1. 编辑源文件
+2. 转到 `chrome://extensions/`
+3. 点击扩展程序卡上的刷新图标
+4. 测试您的更改
 
-Note: Translation feature requires integration with a translation API.
