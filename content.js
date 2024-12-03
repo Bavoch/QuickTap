@@ -261,15 +261,15 @@ class QuickTap {
     }
 
     autoCompleteUrl(input) {
-        // 移除开头和结尾的空格
+        // Remove leading/trailing whitespace and convert to lowercase
         input = input.trim().toLowerCase();
         
-        // 如果已经是完整的URL，直接返回
+        // If it's already a complete URL, return it
         if (input.startsWith('http://') || input.startsWith('https://')) {
             return input;
         }
 
-        // 常见网站的特殊处理
+        // Common websites mapping
         const commonSites = {
             'google': 'www.google.com',
             'gmail': 'mail.google.com',
@@ -298,17 +298,29 @@ class QuickTap {
             'weibo': 'www.weibo.com'
         };
 
-        // 检查是否是常见网站
+        // Check if it's a common website
         if (commonSites[input]) {
             return 'https://' + commonSites[input];
         }
 
-        // 处理已经包含域名的情况
+        // Handle domain names with or without www
         if (input.includes('.')) {
-            return 'https://' + (input.startsWith('www.') ? input : 'www.' + input);
+            // If it already has www. prefix
+            if (input.startsWith('www.')) {
+                return 'https://' + input;
+            }
+            // Add www. prefix for common TLDs
+            const commonTlds = ['com', 'org', 'net', 'edu', 'gov', 'io', 'co'];
+            const parts = input.split('.');
+            const tld = parts[parts.length - 1];
+            if (commonTlds.includes(tld)) {
+                return 'https://www.' + input;
+            }
+            // For other TLDs, don't add www.
+            return 'https://' + input;
         }
 
-        // 默认添加.com后缀
+        // If it's just a single word, assume it's a .com domain
         return 'https://www.' + input + '.com';
     }
 
@@ -335,8 +347,14 @@ class QuickTap {
 
     async handleAddApp() {
         const title = document.title;
-        const url = window.location.href;
-        let favicon = this.getFavicon();
+        const url = this.autoCompleteUrl(window.location.href);
+        let favicon = await this.getFavicon();
+        
+        // If favicon fetching failed, generate a default icon
+        if (!favicon) {
+            favicon = this.generateDefaultIcon(title);
+        }
+        
         const app = { title, url, favicon };
         
         const apps = await this.getApps();
@@ -444,8 +462,26 @@ class QuickTap {
         iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
         iconImg.src = app.favicon;
         
-        this.editModal.querySelector('.edit-title').value = app.title;
-        this.editModal.querySelector('.edit-url').value = app.url;
+        const titleInput = this.editModal.querySelector('.edit-title');
+        const urlInput = this.editModal.querySelector('.edit-url');
+        
+        titleInput.value = app.title;
+        urlInput.value = app.url;
+        
+        // Add input event listener for URL changes
+        urlInput.addEventListener('input', async () => {
+            const url = this.autoCompleteUrl(urlInput.value.trim());
+            if (url) {
+                try {
+                    const domain = new URL(url).hostname;
+                    const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+                    iconImg.src = faviconUrl;
+                } catch (error) {
+                    // If URL is invalid, keep the current favicon
+                    console.error('Invalid URL:', error);
+                }
+            }
+        });
         
         this.editModal.style.display = 'block';
         this.hideContextMenu();
@@ -453,6 +489,9 @@ class QuickTap {
 
     hideEditModal() {
         this.editModal.style.display = 'none';
+        // Remove input event listener
+        const urlInput = this.editModal.querySelector('.edit-url');
+        urlInput.removeEventListener('input', () => {});
     }
 
     async handleDelete() {
@@ -466,19 +505,20 @@ class QuickTap {
     async handleSaveEdit() {
         const apps = await this.getApps();
         const title = this.editModal.querySelector('.edit-title').value;
-        const url = this.editModal.querySelector('.edit-url').value;
+        const rawUrl = this.editModal.querySelector('.edit-url').value;
+        const url = this.autoCompleteUrl(rawUrl);
         const favicon = this.editModal.querySelector('.edit-app-icon img').src;
         
-        // If the title changed, regenerate the default icon
-        if (title !== apps[this.currentAppIndex].title) {
-            const img = this.editModal.querySelector('.edit-app-icon img');
-            if (img.src.startsWith('data:')) { // If using default icon
-                await this.handleImageError(img, title, this.currentAppIndex);
-                apps[this.currentAppIndex] = { title, url, favicon: img.src };
-            } else {
-                apps[this.currentAppIndex] = { title, url, favicon };
-            }
+        // Create new app if currentAppIndex is null
+        if (this.currentAppIndex === null) {
+            const newApp = {
+                title,
+                url,
+                favicon
+            };
+            apps.push(newApp);
         } else {
+            // Update existing app
             apps[this.currentAppIndex] = { title, url, favicon };
         }
         
