@@ -27,19 +27,72 @@ class QuickTap {
         this.popup.className = 'quicktap-popup';
         this.popup.innerHTML = `
             <div class="quicktap-container">
-                <input type="text" class="quicktap-search" placeholder="Search, translate, or enter URL">
+                <div class="quicktap-search-container">
+                    <input type="text" class="quicktap-search" placeholder="Search, translate, or enter URL">
+                    <div class="loading-spinner"></div>
+                </div>
                 <div class="quicktap-apps">
-                    <div class="app-list"></div>
-                    <button class="add-app-btn">+</button>
+                    <div class="app-list-container">
+                        <div class="app-list"></div>
+                        <button class="add-app-btn">+</button>
+                    </div>
                 </div>
             </div>
+            <style>
+                .quicktap-apps {
+                    padding: 10px;
+                }
+                .app-list-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    align-items: center;
+                }
+                .app-list {
+                    display: contents;
+                }
+                .app-icon {
+                    flex: 0 0 auto;
+                }
+                .add-app-btn {
+                    flex: 0 0 auto;
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 8px;
+                    border: 2px dashed #ccc;
+                    background: transparent;
+                    color: #666;
+                    font-size: 24px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0;
+                    margin: 0;
+                }
+                .add-app-btn:hover {
+                    border-color: #999;
+                    color: #999;
+                }
+            </style>
         `;
 
         // Add popup to document
         document.body.appendChild(this.popup);
 
+        // Store references to elements
+        this.searchBox = this.popup.querySelector('.quicktap-search');
+        this.loadingSpinner = this.popup.querySelector('.loading-spinner');
+
         // Add keyboard event listener
         document.addEventListener('keydown', (e) => {
+            // Skip if the active element is an input field
+            if (document.activeElement.tagName === 'INPUT' || 
+                document.activeElement.tagName === 'TEXTAREA' || 
+                document.activeElement.isContentEditable) {
+                return;
+            }
+            
             // Check if the pressed keys match the shortcut
             if (e.key.toLowerCase() === this.shortcut.key &&
                 e.ctrlKey === this.shortcut.ctrl &&
@@ -110,6 +163,13 @@ class QuickTap {
 
         // Load saved apps
         this.loadApps();
+
+        // Add input event listener to update loading position
+        this.searchBox.addEventListener('input', () => {
+            if (this.loadingSpinner.classList.contains('visible')) {
+                this.updateLoadingPosition();
+            }
+        });
     }
 
     createAppIcon(app, index) {
@@ -325,18 +385,44 @@ class QuickTap {
     }
 
     async translate(text) {
-        // Detect language first
-        const sourceLang = await this.detectLanguage(text);
-        const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
+        // Show loading spinner and position it after the text
+        this.loadingSpinner.classList.add('visible');
+        this.updateLoadingPosition();
         
         try {
+            // Detect language first
+            const sourceLang = await this.detectLanguage(text);
+            const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
+            
             const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
             const data = await response.json();
             return data[0][0][0];
         } catch (error) {
             console.error('Translation error:', error);
             return text;
+        } finally {
+            // Hide loading spinner
+            this.loadingSpinner.classList.remove('visible');
         }
+    }
+
+    updateLoadingPosition() {
+        // Create a temporary span to measure text width
+        const span = document.createElement('span');
+        span.style.visibility = 'hidden';
+        span.style.position = 'absolute';
+        span.style.whiteSpace = 'pre';
+        span.style.font = window.getComputedStyle(this.searchBox).font;
+        span.textContent = this.searchBox.value;
+        document.body.appendChild(span);
+
+        // Calculate position
+        const textWidth = span.offsetWidth;
+        const inputPadding = parseInt(window.getComputedStyle(this.searchBox).paddingLeft);
+        this.loadingSpinner.style.left = `${inputPadding + textWidth}px`;
+
+        // Clean up
+        document.body.removeChild(span);
     }
 
     async detectLanguage(text) {
