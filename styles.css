@@ -218,18 +218,44 @@
     height: 64px;
     margin: 0 auto 16px;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #2d2d2d;
     border: 2px solid #333;
+    position: relative;
 }
 
 .edit-app-icon img {
     width: 48px;
     height: 48px;
     object-fit: contain;
+}
+
+.edit-app-icon .icon-context-menu {
+    position: absolute;
+    background: #2d2d2d;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    padding: 8px 0;
+    min-width: 150px;
+    z-index: 1000002;
+    border: 1px solid #333;
+}
+
+.edit-app-icon .context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    transition: background 0.2s;
+}
+
+.edit-app-icon .context-menu-item:hover {
+    background: #383838;
 }
 
 .edit-app-modal input {

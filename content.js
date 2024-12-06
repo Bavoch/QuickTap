@@ -28,7 +28,7 @@ class QuickTap {
         this.popup.innerHTML = `
             <div class="quicktap-container">
                 <div class="quicktap-search-container">
-                    <input type="text" class="quicktap-search" placeholder="Search, translate, or enter URL">
+                    <input type="text" class="quicktap-search" placeholder="搜索、翻译或输入网址">
                     <div class="loading-spinner"></div>
                 </div>
                 <div class="quicktap-apps">
@@ -109,10 +109,10 @@ class QuickTap {
         this.contextMenu.style.display = 'none';
         this.contextMenu.innerHTML = `
             <div class="context-menu-item edit">
-                <span>✏️ Edit</span>
+                <span>✏️ 编辑</span>
             </div>
             <div class="context-menu-item delete">
-                <span>🗑️ Delete</span>
+                <span>🗑️ 删除</span>
             </div>
         `;
 
@@ -124,16 +124,28 @@ class QuickTap {
         this.editModal.className = 'edit-app-modal';
         this.editModal.style.display = 'none';
         this.editModal.innerHTML = `
-            <h3>Edit App</h3>
-            <div class="edit-app-icon">
-                <img src="" alt="App Icon">
+            <h3>编辑应用</h3>
+            <div class="edit-app-icon" id="editAppIcon">
+                <img src="" alt="应用图标">
+                <div class="icon-context-menu" style="display: none;">
+                    <div class="context-menu-item upload">
+                        <span>📤 本地上传</span>
+                    </div>
+                    <div class="context-menu-item paste">
+                        <span>📋 粘贴替换</span>
+                    </div>
+                    <div class="context-menu-item reset">
+                        <span>🔄 重置图标</span>
+                    </div>
+                </div>
             </div>
-            <input type="text" class="edit-title" placeholder="Title">
-            <input type="text" class="edit-url" placeholder="URL">
+            <input type="text" class="edit-title" placeholder="标题">
+            <input type="text" class="edit-url" placeholder="网址">
             <div class="buttons">
-                <button class="cancel-btn">Cancel</button>
-                <button class="save-btn">Save</button>
+                <button class="cancel-btn">取消</button>
+                <button class="save-btn">保存</button>
             </div>
+            <input type="file" id="iconUpload" accept="image/*" style="display: none;">
         `;
 
         // Add edit modal to document
@@ -153,6 +165,91 @@ class QuickTap {
         // Edit modal event listeners
         this.editModal.querySelector('.save-btn').addEventListener('click', () => this.handleSaveEdit());
         this.editModal.querySelector('.cancel-btn').addEventListener('click', () => this.hideEditModal());
+
+        // Add icon context menu event listeners
+        const editAppIcon = this.editModal.querySelector('#editAppIcon');
+        const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
+        const iconUpload = this.editModal.querySelector('#iconUpload');
+
+        editAppIcon.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const rect = editAppIcon.getBoundingClientRect();
+            iconContextMenu.style.display = 'block';
+            iconContextMenu.style.left = `${e.clientX - rect.left}px`;
+            iconContextMenu.style.top = `${e.clientY - rect.top}px`;
+        });
+
+        // Hide icon context menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!iconContextMenu.contains(e.target)) {
+                iconContextMenu.style.display = 'none';
+            }
+        });
+
+        // Handle local upload
+        this.editModal.querySelector('.upload').addEventListener('click', () => {
+            iconUpload.click();
+            iconContextMenu.style.display = 'none';
+        });
+
+        iconUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = this.editModal.querySelector('.edit-app-icon img');
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Handle paste replace
+        this.editModal.querySelector('.paste').addEventListener('click', async () => {
+            try {
+                const clipboardItems = await navigator.clipboard.read();
+                for (const clipboardItem of clipboardItems) {
+                    for (const type of clipboardItem.types) {
+                        if (type.startsWith('image/')) {
+                            const blob = await clipboardItem.getType(type);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = this.editModal.querySelector('.edit-app-icon img');
+                                img.src = e.target.result;
+                            };
+                            reader.readAsDataURL(blob);
+                            break;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to read clipboard contents: ', err);
+            }
+            iconContextMenu.style.display = 'none';
+        });
+
+        // Handle reset icon
+        this.editModal.querySelector('.reset').addEventListener('click', async () => {
+            const apps = await this.getApps();
+            const app = apps[this.currentAppIndex];
+            const img = this.editModal.querySelector('.edit-app-icon img');
+            
+            // Try to get the favicon from the URL
+            const urlInput = this.editModal.querySelector('.edit-url');
+            const url = this.autoCompleteUrl(urlInput.value.trim());
+            if (url) {
+                try {
+                    const domain = new URL(url).hostname;
+                    const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+                    img.src = faviconUrl;
+                } catch (error) {
+                    // If URL is invalid, generate default icon
+                    const titleInput = this.editModal.querySelector('.edit-title');
+                    img.src = this.generateDefaultIcon(titleInput.value);
+                }
+            }
+            iconContextMenu.style.display = 'none';
+        });
 
         // Close context menu when clicking outside
         document.addEventListener('click', (e) => {
@@ -444,13 +541,14 @@ class QuickTap {
         const app = { title, url, favicon };
         
         const apps = await this.getApps();
-        const appIndex = apps.length;
         apps.push(app);
         await chrome.storage.sync.set({ apps });
 
-        // Immediately add the new app to the list
-        const appList = this.popup.querySelector('.app-list');
-        appList.appendChild(this.createAppIcon(app, appIndex));
+        // 重新加载整个应用列表而不是直接添加
+        await this.loadApps();
+        
+        // 关闭弹窗
+        this.togglePopup();
     }
 
     getFavicon() {
@@ -495,7 +593,7 @@ class QuickTap {
                     if (match) {
                         size = parseInt(match[1]);
                     } else if (sizes === 'any') {
-                        size = 192; // 假设 "any" 是大图标
+                        size = 192; // 假设 "any" 是大图
                     }
                 } else {
                     // 对于没有指定尺寸的图标，根据类型赋予默认尺寸
@@ -537,7 +635,6 @@ class QuickTap {
 
     hideContextMenu() {
         this.contextMenu.style.display = 'none';
-        this.currentAppIndex = null;
     }
 
     async handleEdit() {
@@ -563,21 +660,25 @@ class QuickTap {
                     const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
                     iconImg.src = faviconUrl;
                 } catch (error) {
-                    // If URL is invalid, keep the current favicon
                     console.error('Invalid URL:', error);
                 }
             }
         });
         
         this.editModal.style.display = 'block';
-        this.hideContextMenu();
+        this.contextMenu.style.display = 'none';  // 只隐藏右键菜单，不清除 currentAppIndex
     }
 
     hideEditModal() {
         this.editModal.style.display = 'none';
-        // Remove input event listener
+        // 移除 URL 输入事件监听器
         const urlInput = this.editModal.querySelector('.edit-url');
-        urlInput.removeEventListener('input', () => {});
+        const oldListener = urlInput.onInput;
+        if (oldListener) {
+            urlInput.removeEventListener('input', oldListener);
+        }
+        // 清除 currentAppIndex
+        this.currentAppIndex = null;
     }
 
     async handleDelete() {
@@ -589,28 +690,36 @@ class QuickTap {
     }
 
     async handleSaveEdit() {
-        const apps = await this.getApps();
-        const title = this.editModal.querySelector('.edit-title').value;
-        const rawUrl = this.editModal.querySelector('.edit-url').value;
-        const url = this.autoCompleteUrl(rawUrl);
-        const favicon = this.editModal.querySelector('.edit-app-icon img').src;
-        
-        // Create new app if currentAppIndex is null
-        if (this.currentAppIndex === null) {
-            const newApp = {
-                title,
-                url,
-                favicon
-            };
-            apps.push(newApp);
-        } else {
-            // Update existing app
-            apps[this.currentAppIndex] = { title, url, favicon };
+        const titleInput = this.editModal.querySelector('.edit-title');
+        const urlInput = this.editModal.querySelector('.edit-url');
+        const img = this.editModal.querySelector('.edit-app-icon img');
+    
+        const title = titleInput.value.trim();
+        const url = this.autoCompleteUrl(urlInput.value.trim());
+        const favicon = img.src;
+    
+        if (title && url) {
+            try {
+                let apps = await this.getApps();
+                if (!Array.isArray(apps)) {
+                    apps = [];
+                }
+    
+                if (this.currentAppIndex !== null && this.currentAppIndex < apps.length) {
+                    // 更新现有应用
+                    apps[this.currentAppIndex] = { title, url, favicon };
+                } else {
+                    // 添加新应用
+                    apps.push({ title, url, favicon });
+                }
+            
+                await chrome.storage.sync.set({ apps });
+                await this.loadApps();
+                this.hideEditModal();
+            } catch (error) {
+                console.error('Error saving app:', error);
+            }
         }
-        
-        await chrome.storage.sync.set({ apps });
-        this.hideEditModal();
-        this.loadApps();
     }
 
     async saveApp(app) {

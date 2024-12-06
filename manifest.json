@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "QuickTap",
   "version": "1.0",
-  "description": "Quick search, translate and access your favorite websites",
+  "description": "快速搜索、翻译和访问您喜爱的网站",
   "permissions": [
     "activeTab",
     "storage",
