@@ -1,66 +1,382 @@
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 .quicktap-popup {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.75);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    top: 300px;
     display: none;
-    justify-content: center;
-    align-items: center;
     z-index: 999999;
 }
 
 .quicktap-popup.visible {
-    display: flex;
+    display: block;
 }
 
 .quicktap-container {
-    background: #1e1e1e;
+    width: 590px;
+    height: auto;
+    min-height: 144px;
+    max-height: 80vh;
     padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    width: 600px;
-    max-width: 90%;
-    border: 1px solid #333;
+    background: rgba(33, 33, 33, 0.7);
+    box-shadow: 0px 4px 4px 0px rgba(255, 255, 255, 0.05) inset, 0px 0px 12px 0px rgba(255, 255, 255, 0.08) inset, 0px 5px 50px 0px rgba(0, 0, 0, 0.80);
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 16px;
 }
 
 .quicktap-search-container {
-    position: relative;
+    width: 100%;
+    height: 48px;
+    padding: 4px 4px 4px 12px;
+    background: rgba(0, 0, 0, 0.40);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
-    width: 100%;
+    gap: 8px;
+    position: relative;
 }
 
 .quicktap-search {
     width: 100%;
-    padding: 10px 15px;
-    font-size: 16px;
+    height: 100%;
+    background: transparent;
     border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 14px;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 400;
     outline: none;
-    transition: all 0.3s;
+    padding: 0;
 }
 
-.quicktap-search:focus {
+.quicktap-search::placeholder {
+    color: rgba(255, 255, 255, 0.40);
+}
+
+.quicktap-apps {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    overflow-y: visible;
+    max-height: calc(80vh - 144px);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-right: 4px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.quicktap-apps::-webkit-scrollbar {
+    display: none;
+}
+
+.app-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    min-width: 0;
+}
+
+.app-icon {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.app-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.05));
+}
+
+.app-icon:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.20);
+}
+
+.app-icon:hover img {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+}
+
+.add-app-btn {
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.20);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: all 0.2s ease;
+    order: 1;
+}
+
+.add-app-btn:hover {
+    background: rgba(0, 0, 0, 0.30);
+    border-color: rgba(255, 255, 255, 0.20);
+    transform: translateY(-2px);
+}
+
+.plus-icon {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.icon {
+    width: 14px;
+    height: 14px;
+    position: relative;
+}
+
+.icon::before,
+.icon::after {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.70);
+    border-radius: 1px;
+}
+
+.icon::before {
+    width: 14px;
+    height: 2px;
+    top: 6px;
+    left: 0;
+}
+
+.icon::after {
+    width: 2px;
+    height: 14px;
+    left: 6px;
+    top: 0;
+}
+
+/* Context menu styles */
+.context-menu,
+.icon-context-menu {
+    position: fixed;
+    width: 90px;
+    background: rgba(33, 33, 33, 0.85);
+    border-radius: 12px;
+    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 1000002;
+}
+
+.context-menu-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 12px;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.context-menu-item:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.context-menu-item.delete {
+    color: #FF4444;
+}
+
+.context-menu-item.delete:hover {
+    background: rgba(255, 68, 68, 0.10);
+}
+
+.context-menu-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+/* Edit modal styles */
+.edit-app-modal {
+    position: fixed;
+    width: 240px;
+    padding: 16px;
+    background: rgba(33, 33, 33, 0.85);
+    border-radius: 20px;
+    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000001;
+}
+
+.edit-app-modal h3 {
+    color: rgba(255, 255, 255, 0.50);
+    font-size: 12px;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 400;
+    margin: 0;
+}
+
+.edit-app-modal .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.edit-app-modal .buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.edit-app-modal .save-btn {
+    padding: 4px 12px;
+    background: #58E348;
+    color: #0B4E10;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.edit-app-modal .save-btn:hover {
+    background: #69F459;
+}
+
+.edit-app-modal .cancel-btn {
+    padding: 4px 12px;
+    background: rgba(255, 255, 255, 0.10);
+    color: white;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.edit-app-modal .cancel-btn:hover {
     background: rgba(255, 255, 255, 0.15);
+}
+
+.edit-app-modal .form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.edit-app-modal input {
+    width: 100%;
+    height: 36px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.20);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 12px;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 400;
+    outline: none;
+}
+
+.edit-app-modal input::placeholder {
+    color: rgba(255, 255, 255, 0.40);
+}
+
+.edit-app-modal .name-input-container {
+    display: flex;
+    gap: 8px;
+}
+
+.edit-app-modal .name-input-container input {
+    flex: 1;
+}
+
+.edit-app-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.20);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.edit-app-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+}
+
+/* Drag and drop styles */
+.app-icon.dragging {
+    opacity: 0.5;
+    transform: scale(1.05);
+}
+
+.app-icon.drag-over {
+    border-color: #4285f4;
 }
 
 .loading-spinner {
     position: absolute;
-    width: 12px;
-    height: 12px;
-    margin-left: 8px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: #ffffffb0;
-    animation: spin 0.8s linear infinite;
+    width: 16px;
+    height: 16px;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.2s, visibility 0.2s;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.loading-spinner::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 
 .loading-spinner.visible {
@@ -72,243 +388,4 @@
     to {
         transform: rotate(360deg);
     }
-}
-
-.quicktap-apps {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    overflow-x: auto;
-    padding: 10px 0;
-}
-
-.quicktap-apps::-webkit-scrollbar {
-    height: 8px;
-}
-
-.quicktap-apps::-webkit-scrollbar-track {
-    background: #2d2d2d;
-    border-radius: 4px;
-}
-
-.quicktap-apps::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 4px;
-}
-
-.quicktap-apps::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-.app-list {
-    display: flex;
-    gap: 15px;
-}
-
-.app-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #2d2d2d;
-    transition: all 0.2s;
-    border: 2px solid #333;
-    cursor: move;
-}
-
-.app-icon.dragging {
-    opacity: 0.5;
-    transform: scale(1.1);
-    border-color: #4285f4;
-    box-shadow: 0 0 10px rgba(66, 133, 244, 0.3);
-}
-
-.app-icon.drag-over {
-    border-color: #4285f4;
-    transform: scale(1.05);
-}
-
-.app-icon:hover {
-    transform: scale(1.1);
-    border-color: #4285f4;
-    box-shadow: 0 0 10px rgba(66, 133, 244, 0.3);
-}
-
-.app-icon img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-}
-
-.add-app-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    border: 2px dashed #444;
-    background: #2d2d2d;
-    color: #888;
-    font-size: 24px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.add-app-btn:hover {
-    border-color: #4285f4;
-    color: #4285f4;
-    background: #333;
-}
-
-.context-menu {
-    position: fixed;
-    background: #2d2d2d;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    padding: 8px 0;
-    min-width: 150px;
-    z-index: 1000000;
-    border: 1px solid #333;
-}
-
-.context-menu-item {
-    padding: 8px 16px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #fff;
-    transition: background 0.2s;
-}
-
-.context-menu-item:hover {
-    background: #383838;
-}
-
-.context-menu-item.delete {
-    color: #ff4444;
-}
-
-.edit-app-modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #1e1e1e;
-    padding: 24px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    z-index: 1000001;
-    width: 300px;
-    border: 1px solid #333;
-    color: #fff;
-}
-
-.edit-app-modal h3 {
-    margin: 0 0 16px 0;
-    color: #fff;
-}
-
-.edit-app-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 16px;
-    border-radius: 12px;
-    overflow: visible;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #2d2d2d;
-    border: 2px solid #333;
-    position: relative;
-}
-
-.edit-app-icon img {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-}
-
-.edit-app-icon .icon-context-menu {
-    position: absolute;
-    background: #2d2d2d;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    padding: 8px 0;
-    min-width: 150px;
-    z-index: 1000002;
-    border: 1px solid #333;
-}
-
-.edit-app-icon .context-menu-item {
-    padding: 8px 16px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #fff;
-    transition: background 0.2s;
-}
-
-.edit-app-icon .context-menu-item:hover {
-    background: #383838;
-}
-
-.edit-app-modal input {
-    width: 100%;
-    padding: 10px;
-    margin: 8px 0;
-    border: 2px solid #333;
-    border-radius: 8px;
-    background: #2d2d2d;
-    color: #fff;
-    outline: none;
-    transition: all 0.2s;
-}
-
-.edit-app-modal input:focus {
-    border-color: #4285f4;
-    background: #333;
-}
-
-.edit-app-modal input::placeholder {
-    color: #888;
-}
-
-.edit-app-modal .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 20px;
-}
-
-.edit-app-modal button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.edit-app-modal .save-btn {
-    background: #4285f4;
-    color: white;
-}
-
-.edit-app-modal .save-btn:hover {
-    background: #5294ff;
-}
-
-.edit-app-modal .cancel-btn {
-    background: #333;
-    color: #fff;
-}
-
-.edit-app-modal .cancel-btn:hover {
-    background: #444;
 }

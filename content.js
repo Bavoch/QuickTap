@@ -7,7 +7,8 @@ class QuickTap {
         this.editModal = null;
         this.currentAppIndex = null;
         this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false };
-        this.isDragging = false; // 新增属性
+        this.isDragging = false;
+        this.loadingSpinner = null;
         this.init();
 
         // Make instance available globally for error handling
@@ -32,49 +33,15 @@ class QuickTap {
                     <div class="loading-spinner"></div>
                 </div>
                 <div class="quicktap-apps">
-                    <div class="app-list-container">
-                        <div class="app-list"></div>
-                        <button class="add-app-btn">+</button>
+                    <div class="app-list">
+                        <div class="add-app-btn">
+                            <div class="plus-icon">
+                                <div class="icon"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <style>
-                .quicktap-apps {
-                    padding: 10px;
-                }
-                .app-list-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 10px;
-                    align-items: center;
-                }
-                .app-list {
-                    display: contents;
-                }
-                .app-icon {
-                    flex: 0 0 auto;
-                }
-                .add-app-btn {
-                    flex: 0 0 auto;
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 8px;
-                    border: 2px dashed #ccc;
-                    background: transparent;
-                    color: #666;
-                    font-size: 24px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 0;
-                    margin: 0;
-                }
-                .add-app-btn:hover {
-                    border-color: #999;
-                    color: #999;
-                }
-            </style>
         `;
 
         // Add popup to document
@@ -109,10 +76,10 @@ class QuickTap {
         this.contextMenu.style.display = 'none';
         this.contextMenu.innerHTML = `
             <div class="context-menu-item edit">
-                <span>✏️ 编辑</span>
+                <span>编辑</span>
             </div>
             <div class="context-menu-item delete">
-                <span>🗑️ 删除</span>
+                <span>删除</span>
             </div>
         `;
 
@@ -124,26 +91,32 @@ class QuickTap {
         this.editModal.className = 'edit-app-modal';
         this.editModal.style.display = 'none';
         this.editModal.innerHTML = `
-            <h3>编辑应用</h3>
-            <div class="edit-app-icon" id="editAppIcon">
-                <img src="" alt="应用图标">
-                <div class="icon-context-menu" style="display: none;">
-                    <div class="context-menu-item upload">
-                        <span>📤 本地上传</span>
-                    </div>
-                    <div class="context-menu-item paste">
-                        <span>📋 粘贴替换</span>
-                    </div>
-                    <div class="context-menu-item reset">
-                        <span>🔄 重置图标</span>
-                    </div>
+            <div class="header">
+                <h3>编辑应用</h3>
+                <div class="buttons">
+                    <button class="save-btn">保存</button>
+                    <button class="cancel-btn">取消</button>
                 </div>
             </div>
-            <input type="text" class="edit-title" placeholder="标题">
-            <input type="text" class="edit-url" placeholder="网址">
-            <div class="buttons">
-                <button class="cancel-btn">取消</button>
-                <button class="save-btn">保存</button>
+            <div class="form">
+                <div class="name-input-container">
+                    <input type="text" class="edit-title" placeholder="请输入名称">
+                    <div class="edit-app-icon">
+                        <img src="" alt="应用图标">
+                        <div class="icon-context-menu" style="display: none;">
+                            <div class="context-menu-item upload">
+                                <span>本地上传</span>
+                            </div>
+                            <div class="context-menu-item paste">
+                                <span>粘贴替换</span>
+                            </div>
+                            <div class="context-menu-item reset">
+                                <span>重置图标</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <input type="text" class="edit-url" placeholder="请输入地址">
             </div>
             <input type="file" id="iconUpload" accept="image/*" style="display: none;">
         `;
@@ -167,7 +140,7 @@ class QuickTap {
         this.editModal.querySelector('.cancel-btn').addEventListener('click', () => this.hideEditModal());
 
         // Add icon context menu event listeners
-        const editAppIcon = this.editModal.querySelector('#editAppIcon');
+        const editAppIcon = this.editModal.querySelector('.edit-app-icon');
         const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
         const iconUpload = this.editModal.querySelector('#iconUpload');
 
@@ -275,7 +248,7 @@ class QuickTap {
         container.className = 'app-icon';
         container.title = app.title;
         container.dataset.index = index;
-        container.draggable = true; // 启用拖拽
+        container.draggable = true;
 
         const img = document.createElement('img');
         img.alt = app.title;
@@ -303,7 +276,6 @@ class QuickTap {
             this.isDragging = true;
             container.classList.add('dragging');
             e.dataTransfer.setData('text/plain', index);
-            // 设置拖动时的半透明效果
             setTimeout(() => {
                 container.style.opacity = '0.5';
             }, 0);
@@ -313,7 +285,6 @@ class QuickTap {
             this.isDragging = false;
             container.classList.remove('dragging');
             container.style.opacity = '1';
-            // 移除所有图标的dragover效果
             const icons = this.popup.querySelectorAll('.app-icon');
             icons.forEach(icon => icon.classList.remove('drag-over'));
         });
@@ -327,28 +298,7 @@ class QuickTap {
             container.classList.remove('drag-over');
         });
 
-        container.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            container.classList.remove('drag-over');
-            
-            const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-            const toIndex = parseInt(container.dataset.index);
-            
-            if (fromIndex !== toIndex) {
-                // 获取当前应用列表
-                const apps = await this.getApps();
-                
-                // 移动数组元素
-                const [movedApp] = apps.splice(fromIndex, 1);
-                apps.splice(toIndex, 0, movedApp);
-                
-                // 保存新顺序
-                await chrome.storage.sync.set({ apps });
-                
-                // 重新加载应用列表
-                this.loadApps();
-            }
-        });
+        container.addEventListener('drop', (e) => this.handleDrop(e, container));
 
         return container;
     }
@@ -358,39 +308,29 @@ class QuickTap {
         const appList = this.popup.querySelector('.app-list');
         appList.innerHTML = '';
         
-        // 添加拖拽事件到应用列表容器
-        appList.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const draggingElement = this.popup.querySelector('.dragging');
-            if (draggingElement) {
-                const afterElement = this.getDragAfterElement(appList, e.clientX);
-                if (afterElement) {
-                    appList.insertBefore(draggingElement, afterElement);
-                } else {
-                    appList.appendChild(draggingElement);
-                }
-            }
-        });
-        
+        // 先添加所有应用图标
         apps.forEach((app, index) => {
             appList.appendChild(this.createAppIcon(app, index));
         });
+
+        // 添加"加应用"按钮
+        const addButton = document.createElement('div');
+        addButton.className = 'add-app-btn';
+        addButton.innerHTML = `
+            <div class="plus-icon">
+                <div class="icon"></div>
+            </div>
+        `;
+        addButton.addEventListener('click', this.handleAddApp.bind(this));
+        appList.appendChild(addButton);
     }
 
-    // 辅助函数：确定拖拽元素应该放在哪个元素之后
-    getDragAfterElement(container, x) {
-        const draggableElements = [...container.querySelectorAll('.app-icon:not(.dragging)')];
-        
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = x - box.left - box.width / 2;
-            
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    async getApps() {
+        return new Promise((resolve) => {
+            chrome.storage.sync.get(['apps'], (result) => {
+                resolve(result.apps || []);
+            });
+        });
     }
 
     async handleSearch(event) {
@@ -482,12 +422,12 @@ class QuickTap {
     }
 
     async translate(text) {
-        // Show loading spinner and position it after the text
-        this.loadingSpinner.classList.add('visible');
-        this.updateLoadingPosition();
+        if (this.loadingSpinner) {
+            this.loadingSpinner.classList.add('visible');
+            this.updateLoadingPosition();
+        }
         
         try {
-            // Detect language first
             const sourceLang = await this.detectLanguage(text);
             const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
             
@@ -498,13 +438,16 @@ class QuickTap {
             console.error('Translation error:', error);
             return text;
         } finally {
-            // Hide loading spinner
-            this.loadingSpinner.classList.remove('visible');
+            if (this.loadingSpinner) {
+                this.loadingSpinner.classList.remove('visible');
+            }
         }
     }
 
     updateLoadingPosition() {
-        // Create a temporary span to measure text width
+        if (!this.loadingSpinner || !this.searchBox) return;
+
+        // 创建临时 span 来测量文本宽度
         const span = document.createElement('span');
         span.style.visibility = 'hidden';
         span.style.position = 'absolute';
@@ -513,12 +456,14 @@ class QuickTap {
         span.textContent = this.searchBox.value;
         document.body.appendChild(span);
 
-        // Calculate position
+        // 计算文本宽度和输入框的内边距
         const textWidth = span.offsetWidth;
         const inputPadding = parseInt(window.getComputedStyle(this.searchBox).paddingLeft);
-        this.loadingSpinner.style.left = `${inputPadding + textWidth}px`;
 
-        // Clean up
+        // 设置加载动画的位置，添加 16px 的间距
+        this.loadingSpinner.style.left = `${inputPadding + textWidth + 16}px`;
+
+        // 清理临时元素
         document.body.removeChild(span);
     }
 
@@ -544,11 +489,8 @@ class QuickTap {
         apps.push(app);
         await chrome.storage.sync.set({ apps });
 
-        // 重新加载整个应用列表而不是直接添加
+        // 重新加载整个应用列表
         await this.loadApps();
-        
-        // 关闭弹窗
-        this.togglePopup();
     }
 
     getFavicon() {
@@ -619,7 +561,7 @@ class QuickTap {
             return icons[0].url;
         }
 
-        // 如果没有找到任何图标，使用 Google 的 favicon 服务作为后备
+        // 如果没有找到何图标，使用 Google 的 favicon 服务作为后备
         // 请求最大尺寸的图标 (128px)
         return 'https://www.google.com/s2/favicons?sz=128&domain=' + window.location.hostname;
     }
@@ -628,8 +570,8 @@ class QuickTap {
         e.preventDefault();
         const rect = e.target.getBoundingClientRect();
         this.contextMenu.style.display = 'block';
-        this.contextMenu.style.left = `${e.clientX}px`;
-        this.contextMenu.style.top = `${e.clientY}px`;
+        this.contextMenu.style.left = `${rect.right + 8}px`;
+        this.contextMenu.style.top = `${rect.top}px`;
         this.currentAppIndex = index;
     }
 
@@ -641,6 +583,16 @@ class QuickTap {
         const apps = await this.getApps();
         const app = apps[this.currentAppIndex];
         
+        // 获取当前图标的位置
+        const currentIcon = this.popup.querySelector(`.app-icon[data-index="${this.currentAppIndex}"]`);
+        const iconRect = currentIcon.getBoundingClientRect();
+        
+        // 设置弹窗位置
+        this.editModal.style.position = 'fixed';
+        this.editModal.style.top = `${iconRect.bottom + 8}px`;
+        this.editModal.style.left = `${iconRect.left}px`;
+        this.editModal.style.transform = 'none';
+        
         const iconImg = this.editModal.querySelector('.edit-app-icon img');
         iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
         iconImg.src = app.favicon;
@@ -650,20 +602,6 @@ class QuickTap {
         
         titleInput.value = app.title;
         urlInput.value = app.url;
-        
-        // Add input event listener for URL changes
-        urlInput.addEventListener('input', async () => {
-            const url = this.autoCompleteUrl(urlInput.value.trim());
-            if (url) {
-                try {
-                    const domain = new URL(url).hostname;
-                    const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-                    iconImg.src = faviconUrl;
-                } catch (error) {
-                    console.error('Invalid URL:', error);
-                }
-            }
-        });
         
         this.editModal.style.display = 'block';
         this.contextMenu.style.display = 'none';  // 只隐藏右键菜单，不清除 currentAppIndex
@@ -728,14 +666,6 @@ class QuickTap {
         chrome.storage.sync.set({ apps });
     }
 
-    async getApps() {
-        return new Promise((resolve) => {
-            chrome.storage.sync.get(['apps'], (result) => {
-                resolve(result.apps || []);
-            });
-        });
-    }
-
     generateDefaultIcon(title) {
         const canvas = document.createElement('canvas');
         canvas.width = 48;
@@ -775,6 +705,32 @@ class QuickTap {
         this.popup.classList.toggle('visible');
         if (this.popup.classList.contains('visible')) {
             this.searchBox.focus();
+        }
+    }
+
+    async handleDrop(e, container) {
+        e.preventDefault();
+        container.classList.remove('drag-over');
+        
+        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+        const toIndex = parseInt(container.dataset.index);
+        
+        if (fromIndex !== toIndex) {
+            // 获取当前应用列表
+            const apps = await this.getApps();
+            
+            // 移动数组元素
+            const [movedApp] = apps.splice(fromIndex, 1);
+            apps.splice(toIndex, 0, movedApp);
+            
+            // 保存新
+            try {
+                await chrome.storage.sync.set({ apps });
+                // 重新加载应用列表
+                await this.loadApps();
+            } catch (error) {
+                console.error('Error saving app order:', error);
+            }
         }
     }
 }
