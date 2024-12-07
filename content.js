@@ -144,27 +144,19 @@ class QuickTap {
         const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
         const iconUpload = this.editModal.querySelector('#iconUpload');
 
+        // 添加点击上传功能
+        editAppIcon.addEventListener('click', () => {
+            iconUpload.click();
+        });
+
+        // 右键菜单
         editAppIcon.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            const rect = editAppIcon.getBoundingClientRect();
+            e.stopPropagation();
             iconContextMenu.style.display = 'block';
-            iconContextMenu.style.left = `${e.clientX - rect.left}px`;
-            iconContextMenu.style.top = `${e.clientY - rect.top}px`;
         });
 
-        // Hide icon context menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!iconContextMenu.contains(e.target)) {
-                iconContextMenu.style.display = 'none';
-            }
-        });
-
-        // Handle local upload
-        this.editModal.querySelector('.upload').addEventListener('click', () => {
-            iconUpload.click();
-            iconContextMenu.style.display = 'none';
-        });
-
+        // 处理图片上传
         iconUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -174,6 +166,13 @@ class QuickTap {
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
+            }
+        });
+
+        // Hide icon context menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (iconContextMenu && !iconContextMenu.contains(e.target) && !editAppIcon.contains(e.target)) {
+                iconContextMenu.style.display = 'none';
             }
         });
 
@@ -313,7 +312,7 @@ class QuickTap {
             appList.appendChild(this.createAppIcon(app, index));
         });
 
-        // 添加"加应用"按钮
+        // 添加"加用"按钮
         const addButton = document.createElement('div');
         addButton.className = 'add-app-btn';
         addButton.innerHTML = `
@@ -447,7 +446,7 @@ class QuickTap {
     updateLoadingPosition() {
         if (!this.loadingSpinner || !this.searchBox) return;
 
-        // 创建临时 span 来测量文本宽度
+        // 创建临时 span 来测量��本宽度
         const span = document.createElement('span');
         span.style.visibility = 'hidden';
         span.style.position = 'absolute';

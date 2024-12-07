@@ -178,8 +178,7 @@
 }
 
 /* Context menu styles */
-.context-menu,
-.icon-context-menu {
+.context-menu {
     position: fixed;
     width: 90px;
     background: rgba(33, 33, 33, 0.85);
@@ -190,6 +189,21 @@
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     z-index: 1000002;
+}
+
+.icon-context-menu {
+    position: absolute;
+    width: 90px;
+    background: rgba(33, 33, 33, 0.85);
+    border-radius: 12px;
+    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 1000002;
+    left: calc(100% + 8px);
+    top: 0;
 }
 
 .context-menu-item {
@@ -238,6 +252,7 @@
     display: flex;
     flex-direction: column;
     z-index: 1000001;
+    overflow: visible;
 }
 
 .edit-app-modal h3 {
@@ -294,6 +309,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow: visible;
 }
 
 .edit-app-modal input {
@@ -317,6 +333,8 @@
 .edit-app-modal .name-input-container {
     display: flex;
     gap: 8px;
+    overflow: visible;
+    position: relative;
 }
 
 .edit-app-modal .name-input-container input {
@@ -329,18 +347,38 @@
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.20);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    overflow: hidden;
+    overflow: visible;
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-app-icon:hover {
+    background: rgba(0, 0, 0, 0.30);
+    border-color: rgba(255, 255, 255, 0.20);
+}
+
+.edit-app-icon::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0);
+    border-radius: 12px; /* Changed from 8px to 12px to match the icon's border-radius */
+    transition: background-color 0.2s ease;
+}
+
+.edit-app-icon:hover::after {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .edit-app-icon img {
     width: 100%;
     height: 100%;
-    object-fit: fill;
+    object-fit: cover; /* Changed from fill to cover to ensure the image covers the entire icon without overflowing */
     pointer-events: none;
 }
 
