@@ -17,7 +17,7 @@ class QuickTap {
 
     init() {
         // Load shortcut settings
-        chrome.storage.sync.get(['shortcut'], (result) => {
+        chrome.storage.local.get(['shortcut'], (result) => {
             if (result.shortcut) {
                 this.shortcut = result.shortcut;
             }
@@ -169,7 +169,34 @@ class QuickTap {
         editAppIcon.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
+            iconContextMenu.style.visibility = 'visible';
             iconContextMenu.style.display = 'block';
+
+            // 添加一次性点击事件监听器到 document
+            const closeMenu = (event) => {
+                // 如果点击的不是菜单本身
+                if (!iconContextMenu.contains(event.target)) {
+                    iconContextMenu.style.visibility = 'hidden';
+                    iconContextMenu.style.display = 'none';
+                    // 移除事件监听器
+                    document.removeEventListener('click', closeMenu);
+                    document.removeEventListener('contextmenu', closeMenu);
+                }
+            };
+
+            // 延迟添加事件监听器，避免立即触发
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu);
+                document.addEventListener('contextmenu', closeMenu);
+            }, 0);
+        });
+
+        // 左键点击处理
+        editAppIcon.addEventListener('click', () => {
+            const iconUpload = this.editModal.querySelector('#iconUpload');
+            iconUpload.click();
         });
 
         // 处理本地上传
@@ -192,13 +219,8 @@ class QuickTap {
                     img.src = this.generateDefaultIcon(titleInput.value);
                 }
             }
-        });
-
-        // Hide icon context menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (iconContextMenu && !iconContextMenu.contains(e.target) && !editAppIcon.contains(e.target)) {
-                iconContextMenu.style.display = 'none';
-            }
+            // 清空文件输入，这样同一个文件可以再次选择
+            e.target.value = '';
         });
 
         // Handle paste replace
@@ -349,189 +371,32 @@ class QuickTap {
 
     async getApps() {
         return new Promise((resolve) => {
-            chrome.storage.sync.get(['apps'], (result) => {
+            chrome.storage.local.get(['apps'], (result) => {
                 resolve(result.apps || []);
             });
         });
     }
 
-    async handleSearch(event) {
-        if (event.key === 'Enter') {
-            const query = this.searchBox.value.trim();
-            if (event.ctrlKey) {
-                // 自动补全URL并访问
-                const url = this.autoCompleteUrl(query);
-                chrome.runtime.sendMessage({ action: 'openUrl', url: url });
-                this.searchBox.value = ''; 
-                this.togglePopup();
-            } else if (event.shiftKey) {
-                // Translate
-                const translatedText = await this.translate(query);
-                this.searchBox.value = translatedText;
-                this.searchBox.select();
-            } else {
-                // Google search
-                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-                chrome.runtime.sendMessage({ action: 'openUrl', url: searchUrl });
-                this.searchBox.value = ''; 
-                this.togglePopup();
-            }
-        }
-    }
-
-    autoCompleteUrl(input) {
-        // Remove leading/trailing whitespace and convert to lowercase
-        input = input.trim().toLowerCase();
-        
-        // If it's already a complete URL, return it
-        if (input.startsWith('http://') || input.startsWith('https://')) {
-            return input;
-        }
-
-        // Common websites mapping
-        const commonSites = {
-            'google': 'www.google.com',
-            'gmail': 'mail.google.com',
-            'youtube': 'www.youtube.com',
-            'facebook': 'www.facebook.com',
-            'twitter': 'twitter.com',
-            'x': 'twitter.com',
-            'instagram': 'www.instagram.com',
-            'linkedin': 'www.linkedin.com',
-            'github': 'github.com',
-            'reddit': 'www.reddit.com',
-            'amazon': 'www.amazon.com',
-            'netflix': 'www.netflix.com',
-            'spotify': 'www.spotify.com',
-            'microsoft': 'www.microsoft.com',
-            'apple': 'www.apple.com',
-            'yahoo': 'www.yahoo.com',
-            'bing': 'www.bing.com',
-            'wikipedia': 'www.wikipedia.org',
-            'baidu': 'www.baidu.com',
-            'bilibili': 'www.bilibili.com',
-            'zhihu': 'www.zhihu.com',
-            'taobao': 'www.taobao.com',
-            'tmall': 'www.tmall.com',
-            'jd': 'www.jd.com',
-            'weibo': 'www.weibo.com'
-        };
-
-        // Check if it's a common website
-        if (commonSites[input]) {
-            return 'https://' + commonSites[input];
-        }
-
-        // Handle domain names with or without www
-        if (input.includes('.')) {
-            // If it already has www. prefix
-            if (input.startsWith('www.')) {
-                return 'https://' + input;
-            }
-            // Add www. prefix for common TLDs
-            const commonTlds = ['com', 'org', 'net', 'edu', 'gov', 'io', 'co'];
-            const parts = input.split('.');
-            const tld = parts[parts.length - 1];
-            if (commonTlds.includes(tld)) {
-                return 'https://www.' + input;
-            }
-            // For other TLDs, don't add www.
-            return 'https://' + input;
-        }
-
-        // If it's just a single word, assume it's a .com domain
-        return 'https://www.' + input + '.com';
-    }
-
-    async translate(text) {
-        if (this.loadingSpinner) {
-            this.loadingSpinner.classList.add('visible');
-            this.updateLoadingPosition();
-        }
-        
-        try {
-            const sourceLang = await this.detectLanguage(text);
-            const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-            
-            const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
-            const data = await response.json();
-            return data[0][0][0];
-        } catch (error) {
-            console.error('Translation error:', error);
-            return text;
-        } finally {
-            if (this.loadingSpinner) {
-                this.loadingSpinner.classList.remove('visible');
-            }
-        }
-    }
-
-    updateLoadingPosition() {
-        if (!this.loadingSpinner || !this.searchBox) return;
-
-        // 创建临时 span 来测量文本宽度
-        const span = document.createElement('span');
-        span.style.visibility = 'hidden';
-        span.style.position = 'absolute';
-        span.style.whiteSpace = 'pre';
-        span.style.font = window.getComputedStyle(this.searchBox).font;
-        span.textContent = this.searchBox.value;
-        document.body.appendChild(span);
-
-        // 计算文本宽度和输入框的内边距
-        const textWidth = span.offsetWidth;
-        const inputPadding = parseInt(window.getComputedStyle(this.searchBox).paddingLeft);
-
-        // 设置加载动画的位置，添加 16px 的间距
-        this.loadingSpinner.style.left = `${inputPadding + textWidth + 16}px`;
-
-        // 清理临时元素
-        document.body.removeChild(span);
-    }
-
-    async detectLanguage(text) {
-        // Simple language detection based on characters
-        const hasChineseChar = /[\u4E00-\u9FFF]/.test(text);
-        return hasChineseChar ? 'zh' : 'en';
-    }
-
-    async handleAddApp() {
-        const title = document.title;
-        const url = this.autoCompleteUrl(window.location.href);
-        const favicon = await this.getFaviconFromUrl(url);
-        
-        const app = { title, url, favicon };
-        
-        const apps = await this.getApps();
-        apps.push(app);
-        await chrome.storage.sync.set({ apps });
-
-        // 重新加载整个应用列表
-        await this.loadApps();
-    }
-
     async getFaviconFromUrl(url) {
         try {
             const domain = new URL(url).hostname;
-            // 使用 chrome.runtime.sendMessage 获取图标
-            return new Promise((resolve) => {
-                chrome.runtime.sendMessage(
-                    { 
-                        action: 'getFavicon',
-                        domain: domain
-                    },
-                    (response) => {
-                        if (response && response.favicon) {
-                            resolve(response.favicon);
-                        } else {
-                            resolve(this.generateDefaultIcon(domain));
-                        }
-                    }
-                );
+            const response = await new Promise(resolve => {
+                chrome.runtime.sendMessage({ 
+                    action: 'getFavicon', 
+                    domain: domain,
+                    url: url  // 添加完整URL以便后台获取当前标签页图标
+                }, resolve);
             });
+            
+            if (response && response.favicon) {
+                return response.favicon;
+            }
+            
+            // 如果获取失败，返回默认图标
+            return this.generateDefaultIcon(domain);
         } catch (error) {
-            console.error('Error fetching favicon:', error);
-            return this.generateDefaultIcon(new URL(url).hostname);
+            console.error('Error getting favicon:', error);
+            return this.generateDefaultIcon(url);
         }
     }
 
@@ -620,7 +485,7 @@ class QuickTap {
     async handleDelete() {
         const apps = await this.getApps();
         apps.splice(this.currentAppIndex, 1);
-        await chrome.storage.sync.set({ apps });
+        await chrome.storage.local.set({ apps });
         this.hideContextMenu();
         this.loadApps();
     }
@@ -652,7 +517,7 @@ class QuickTap {
                     apps.push({ title, url, favicon: compressedFavicon });
                 }
             
-                await chrome.storage.sync.set({ apps });
+                await chrome.storage.local.set({ apps });
                 await this.loadApps();
                 this.hideEditModal();
             } catch (error) {
@@ -662,9 +527,43 @@ class QuickTap {
     }
 
     async saveApp(app) {
-        const apps = await this.getApps();
-        apps.push(app);
-        chrome.storage.sync.set({ apps });
+        try {
+            // 压缩 favicon 数据
+            if (app.favicon && app.favicon.startsWith('data:image')) {
+                app.favicon = await this.compressImage(app.favicon, 64, 64); // 减小图标尺寸
+            }
+
+            const apps = await this.getApps();
+            
+            // 如果是编辑现有应用
+            if (this.currentAppIndex !== null) {
+                apps[this.currentAppIndex] = app;
+            } else {
+                // 限制应用数量，防止超出配额
+                if (apps.length >= 50) {
+                    apps.shift(); // 删除最旧的应用
+                }
+                apps.push(app);
+            }
+
+            // 尝试保存数据
+            try {
+                await chrome.storage.local.set({ apps });
+            } catch (error) {
+                console.error('Error saving app order:', error);
+            }
+            
+            // 重新加载应用列表
+            await this.loadApps();
+        } catch (error) {
+            console.error('Error saving app:', error);
+            // 在界面上显示错误提示
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'error-message';
+            errorMsg.textContent = '保存失败，请稍后重试';
+            this.popup.appendChild(errorMsg);
+            setTimeout(() => errorMsg.remove(), 3000);
+        }
     }
 
     generateDefaultIcon(title) {
@@ -702,15 +601,37 @@ class QuickTap {
             const apps = await this.getApps();
             if (apps[index]) {
                 apps[index].favicon = defaultIcon;
-                chrome.storage.sync.set({ apps });
+                chrome.storage.local.set({ apps });
             }
         }
     }
 
+    show() {
+        this.popup.classList.add('visible');
+        this.searchBox.focus();
+        this.visible = true;
+    }
+
+    hide() {
+        this.popup.classList.remove('visible');
+        this.searchBox.value = '';
+        this.visible = false;
+        this.clearSearchResults();
+    }
+
     togglePopup() {
-        this.popup.classList.toggle('visible');
-        if (this.popup.classList.contains('visible')) {
-            this.searchBox.focus();
+        if (this.visible) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+
+    clearSearchResults() {
+        const searchResults = this.popup.querySelector('.search-results');
+        if (searchResults) {
+            searchResults.innerHTML = '';
+            searchResults.style.display = 'none';
         }
     }
 
@@ -731,12 +652,13 @@ class QuickTap {
             
             // 保存新
             try {
-                await chrome.storage.sync.set({ apps });
-                // 重新加载应用列表
-                await this.loadApps();
+                await chrome.storage.local.set({ apps });
             } catch (error) {
                 console.error('Error saving app order:', error);
             }
+            
+            // 重新加载应用列表
+            await this.loadApps();
         }
     }
 
@@ -805,6 +727,135 @@ class QuickTap {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    }
+
+    async handleSearch(event) {
+        // 如果是中文输入法正在输入中，不触发搜索
+        if (event.key === 'Enter' && !event.isComposing) {
+            const query = this.searchBox.value.trim();
+            if (event.ctrlKey) {
+                // 自动补全URL并访问
+                const url = this.autoCompleteUrl(query);
+                chrome.runtime.sendMessage({ action: 'openUrl', url: url });
+                this.searchBox.value = ''; 
+                this.togglePopup();
+            } else if (event.shiftKey) {
+                // Translate
+                const translatedText = await this.translate(query);
+                this.searchBox.value = translatedText;
+                this.searchBox.select();
+            } else {
+                // Google search
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                chrome.runtime.sendMessage({ action: 'openUrl', url: searchUrl });
+                this.searchBox.value = ''; 
+                this.togglePopup();
+            }
+        }
+    }
+
+    async translate(text) {
+        if (this.loadingSpinner) {
+            this.loadingSpinner.classList.add('visible');
+            this.updateLoadingPosition();
+        }
+        
+        try {
+            const response = await new Promise(resolve => {
+                chrome.runtime.sendMessage({ 
+                    action: 'translate',
+                    text: text
+                }, resolve);
+            });
+
+            if (response && response.success) {
+                return response.translation;
+            } else {
+                console.error('Translation failed:', response.error);
+                return text;
+            }
+        } catch (error) {
+            console.error('Translation error:', error);
+            return text;
+        } finally {
+            if (this.loadingSpinner) {
+                this.loadingSpinner.classList.remove('visible');
+            }
+        }
+    }
+
+    updateLoadingPosition() {
+        if (!this.loadingSpinner || !this.searchBox) return;
+
+        // 创建临时 span 来测量文本宽度
+        const span = document.createElement('span');
+        span.style.visibility = 'hidden';
+        span.style.position = 'absolute';
+        span.style.whiteSpace = 'pre';
+        span.style.font = window.getComputedStyle(this.searchBox).font;
+        span.textContent = this.searchBox.value;
+        document.body.appendChild(span);
+
+        // 计算文本宽度和输入框的内边距
+        const textWidth = span.offsetWidth;
+        const inputPadding = parseInt(window.getComputedStyle(this.searchBox).paddingLeft);
+
+        // 设置加载动画的位置，添加 16px 的间距
+        this.loadingSpinner.style.left = `${inputPadding + textWidth + 16}px`;
+
+        // 清理临时元素
+        document.body.removeChild(span);
+    }
+
+    async handleAddApp() {
+        const title = document.title;
+        const url = window.location.href;
+        const favicon = await this.getFavicon(url);
+        
+        const app = { title, url, favicon };
+        
+        const apps = await this.getApps();
+        apps.push(app);
+        await chrome.storage.local.set({ apps });
+
+        // 重新加载整个应用列表
+        await this.loadApps();
+    }
+
+    async getFavicon(url) {
+        try {
+            const domain = new URL(url).hostname;
+            const response = await new Promise(resolve => {
+                chrome.runtime.sendMessage({ 
+                    action: 'getFavicon', 
+                    domain: domain,
+                    url: url  // 添加完整URL以便后台获取当前标签页图标
+                }, resolve);
+            });
+            
+            if (response && response.favicon) {
+                return response.favicon;
+            }
+            
+            // 如果获取失败，返回默认图标
+            return this.generateDefaultIcon(domain);
+        } catch (error) {
+            console.error('Error getting favicon:', error);
+            return this.generateDefaultIcon(url);
+        }
+    }
+
+    async getApps() {
+        const result = await chrome.storage.local.get('apps');
+        return result.apps || [];
+    }
+
+    togglePopup() {
+        if (this.visible) {
+            this.hide();
+        } else {
+            this.show();
+        }
     }
 }
 

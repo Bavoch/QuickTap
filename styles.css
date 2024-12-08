@@ -8,14 +8,18 @@
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) scale(0.98);
     top: 300px;
-    display: none;
+    opacity: 0;
+    visibility: hidden;
     z-index: 999999;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .quicktap-popup.visible {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, calc(-50% - 2px)) scale(1);
 }
 
 .quicktap-container {
@@ -24,8 +28,10 @@
     min-height: 144px;
     max-height: 80vh;
     padding: 20px;
-    background: rgba(33, 33, 33, 0.7);
-    box-shadow: 0px 4px 4px 0px rgba(255, 255, 255, 0.05) inset, 0px 0px 12px 0px rgba(255, 255, 255, 0.08) inset, 0px 5px 50px 0px rgba(0, 0, 0, 0.80);
+    background: rgba(33, 33, 33, 0.9);
+    box-shadow: 0px 4px 4px 0px rgba(255, 255, 255, 0.05) inset, 
+                0px 0px 12px 0px rgba(255, 255, 255, 0.08) inset, 
+                0px 5px 50px 0px rgba(0, 0, 0, 0.80);
     border-radius: 32px;
     border: 1px solid rgba(255, 255, 255, 0.10);
     backdrop-filter: blur(20px);
@@ -34,7 +40,8 @@
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
-    gap: 16px;
+    gap: 20px;
+    transform-origin: top;
 }
 
 .quicktap-search-container {
@@ -178,7 +185,8 @@
 }
 
 /* Context menu styles */
-.context-menu {
+.context-menu,
+.icon-context-menu {
     position: fixed;
     width: 90px;
     background: rgba(33, 33, 33, 0.85);
@@ -193,20 +201,13 @@
 
 .icon-context-menu {
     position: absolute;
-    width: 90px;
-    background: rgba(33, 33, 33, 0.85);
-    border-radius: 12px;
-    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
-    padding: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    z-index: 1000002;
     left: calc(100% + 8px);
     top: 0;
+    visibility: hidden;
 }
 
-.context-menu-item {
+.context-menu-item,
+.icon-context-menu .context-menu-item {
     padding: 4px 8px;
     cursor: pointer;
     display: flex;
@@ -217,25 +218,22 @@
     font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     border-radius: 8px;
     transition: background 0.2s;
+    white-space: nowrap;
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover,
+.icon-context-menu .context-menu-item:hover {
     background: rgba(255, 255, 255, 0.10);
 }
 
-.context-menu-item.delete {
+.context-menu-item.delete,
+.icon-context-menu .context-menu-item.delete {
     color: #FF4444;
 }
 
-.context-menu-item.delete:hover {
+.context-menu-item.delete:hover,
+.icon-context-menu .context-menu-item.delete:hover {
     background: rgba(255, 68, 68, 0.10);
-}
-
-.context-menu-item span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: left;
 }
 
 /* Edit modal styles */
@@ -342,11 +340,11 @@
 }
 
 .edit-app-icon {
+    position: relative;
+    overflow: visible !important;
     width: 36px;
     height: 36px;
     border-radius: 12px;
-    overflow: hidden;
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -356,27 +354,14 @@
 }
 
 .edit-app-icon:hover {
-    background: rgba(0, 0, 0, 0.30);
-    border-color: rgba(255, 255, 255, 0.20);
-}
-
-.edit-app-icon::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0);
-    border-radius: 12px; /* Changed from 8px to 12px to match the icon's border-radius */
-    transition: background-color 0.2s ease;
-}
-
-.edit-app-icon:hover::after {
     background: rgba(255, 255, 255, 0.05);
 }
 
 .edit-app-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Changed from fill to cover to ensure the image covers the entire icon without overflowing */
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    object-fit: cover;
     pointer-events: none;
 }
 
@@ -423,5 +408,30 @@
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+.error-message {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff4444;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
     }
 }
