@@ -122,9 +122,9 @@
     width: 40px;
     height: 40px;
     padding: 8px;
-    background: rgba(0, 0, 0, 0.20);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -135,9 +135,9 @@
 }
 
 .add-app-btn:hover {
-    background: rgba(0, 0, 0, 0.30);
+    background: rgba(0, 0, 0, 0);
     border-color: rgba(255, 255, 255, 0.20);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 
 .plus-icon {
@@ -344,10 +344,8 @@
 .edit-app-icon {
     width: 36px;
     height: 36px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.20);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    overflow: visible;
+    border-radius: 12px;
+    overflow: hidden;
     position: relative;
     display: flex;
     align-items: center;

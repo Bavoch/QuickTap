@@ -44,32 +44,6 @@ class QuickTap {
             </div>
         `;
 
-        // Add popup to document
-        document.body.appendChild(this.popup);
-
-        // Store references to elements
-        this.searchBox = this.popup.querySelector('.quicktap-search');
-        this.loadingSpinner = this.popup.querySelector('.loading-spinner');
-
-        // Add keyboard event listener
-        document.addEventListener('keydown', (e) => {
-            // Skip if the active element is an input field
-            if (document.activeElement.tagName === 'INPUT' || 
-                document.activeElement.tagName === 'TEXTAREA' || 
-                document.activeElement.isContentEditable) {
-                return;
-            }
-            
-            // Check if the pressed keys match the shortcut
-            if (e.key.toLowerCase() === this.shortcut.key &&
-                e.ctrlKey === this.shortcut.ctrl &&
-                e.altKey === this.shortcut.alt &&
-                e.shiftKey === this.shortcut.shift) {
-                e.preventDefault();
-                this.togglePopup();
-            }
-        });
-
         // Create context menu
         this.contextMenu = document.createElement('div');
         this.contextMenu.className = 'context-menu';
@@ -82,9 +56,6 @@ class QuickTap {
                 <span>删除</span>
             </div>
         `;
-
-        // Add context menu to document
-        document.body.appendChild(this.contextMenu);
 
         // Create edit modal
         this.editModal = document.createElement('div');
@@ -121,8 +92,58 @@ class QuickTap {
             <input type="file" id="iconUpload" accept="image/*" style="display: none;">
         `;
 
-        // Add edit modal to document
+        // Add elements to document
+        document.body.appendChild(this.popup);
+        document.body.appendChild(this.contextMenu);
         document.body.appendChild(this.editModal);
+
+        // Store references to elements
+        this.searchBox = this.popup.querySelector('.quicktap-search');
+        this.loadingSpinner = this.popup.querySelector('.loading-spinner');
+
+        // Add click event listener to close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (this.popup.classList.contains('visible') && 
+                !this.popup.contains(e.target) && 
+                !this.editModal.contains(e.target) && 
+                !this.contextMenu.contains(e.target)) {
+                this.hideEditModal();
+                this.hideContextMenu();
+                this.togglePopup();
+            }
+        });
+
+        // Prevent closing when clicking inside elements
+        this.popup.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        this.editModal.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        this.contextMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Add keyboard event listener
+        document.addEventListener('keydown', (e) => {
+            // Skip if the active element is an input field
+            if (document.activeElement.tagName === 'INPUT' || 
+                document.activeElement.tagName === 'TEXTAREA' || 
+                document.activeElement.isContentEditable) {
+                return;
+            }
+            
+            // Check if the pressed keys match the shortcut
+            if (e.key.toLowerCase() === this.shortcut.key &&
+                e.ctrlKey === this.shortcut.ctrl &&
+                e.altKey === this.shortcut.alt &&
+                e.shiftKey === this.shortcut.shift) {
+                e.preventDefault();
+                this.togglePopup();
+            }
+        });
 
         // Add event listeners
         this.searchBox = this.popup.querySelector('.quicktap-search');
@@ -144,11 +165,6 @@ class QuickTap {
         const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
         const iconUpload = this.editModal.querySelector('#iconUpload');
 
-        // 添加点击上传功能
-        editAppIcon.addEventListener('click', () => {
-            iconUpload.click();
-        });
-
         // 右键菜单
         editAppIcon.addEventListener('contextmenu', (e) => {
             e.preventDefault();
@@ -156,16 +172,25 @@ class QuickTap {
             iconContextMenu.style.display = 'block';
         });
 
+        // 处理本地上传
+        this.editModal.querySelector('.upload').addEventListener('click', () => {
+            iconUpload.click();
+            iconContextMenu.style.display = 'none';
+        });
+
         // 处理图片上传
-        iconUpload.addEventListener('change', (e) => {
+        iconUpload.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
+                try {
+                    await this.handleImageUpload(file);
+                } catch (error) {
+                    console.error('Error uploading image:', error);
+                    // 如果上传失败，使用默认图标
+                    const titleInput = this.editModal.querySelector('.edit-title');
                     const img = this.editModal.querySelector('.edit-app-icon img');
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
+                    img.src = this.generateDefaultIcon(titleInput.value);
+                }
             }
         });
 
@@ -202,21 +227,19 @@ class QuickTap {
 
         // Handle reset icon
         this.editModal.querySelector('.reset').addEventListener('click', async () => {
-            const apps = await this.getApps();
-            const app = apps[this.currentAppIndex];
+            const urlInput = this.editModal.querySelector('.edit-url');
+            const titleInput = this.editModal.querySelector('.edit-title');
             const img = this.editModal.querySelector('.edit-app-icon img');
             
             // Try to get the favicon from the URL
-            const urlInput = this.editModal.querySelector('.edit-url');
             const url = this.autoCompleteUrl(urlInput.value.trim());
             if (url) {
                 try {
-                    const domain = new URL(url).hostname;
-                    const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-                    img.src = faviconUrl;
+                    const favicon = await this.getFaviconFromUrl(url);
+                    img.src = favicon;
                 } catch (error) {
                     // If URL is invalid, generate default icon
-                    const titleInput = this.editModal.querySelector('.edit-title');
+                    console.error('Failed to reset icon:', error);
                     img.src = this.generateDefaultIcon(titleInput.value);
                 }
             }
@@ -446,7 +469,7 @@ class QuickTap {
     updateLoadingPosition() {
         if (!this.loadingSpinner || !this.searchBox) return;
 
-        // 创建临时 span 来测量��本宽度
+        // 创建临时 span 来测量文本宽度
         const span = document.createElement('span');
         span.style.visibility = 'hidden';
         span.style.position = 'absolute';
@@ -475,12 +498,7 @@ class QuickTap {
     async handleAddApp() {
         const title = document.title;
         const url = this.autoCompleteUrl(window.location.href);
-        let favicon = await this.getFavicon();
-        
-        // If favicon fetching failed, generate a default icon
-        if (!favicon) {
-            favicon = this.generateDefaultIcon(title);
-        }
+        const favicon = await this.getFaviconFromUrl(url);
         
         const app = { title, url, favicon };
         
@@ -492,77 +510,29 @@ class QuickTap {
         await this.loadApps();
     }
 
-    getFavicon() {
-        // 收集所有可能的图标
-        const icons = [];
-        
-        // 检查所有图标相关的链接
-        const iconSelectors = [
-            'link[rel="icon"][sizes]',
-            'link[rel="shortcut icon"][sizes]',
-            'link[rel="apple-touch-icon"][sizes]',
-            'link[rel="apple-touch-icon-precomposed"][sizes]',
-            'meta[name="msapplication-TileImage"]',
-            'link[rel="fluid-icon"]',
-            'link[rel="mask-icon"]',
-            // 没有指定尺寸的图标
-            'link[rel="icon"]:not([sizes])',
-            'link[rel="shortcut icon"]:not([sizes])',
-            'link[rel="apple-touch-icon"]:not([sizes])',
-            'link[rel="apple-touch-icon-precomposed"]:not([sizes])'
-        ];
-
-        // 获取所有图标元素
-        iconSelectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(element => {
-                let iconUrl;
-                let size = 0;
-
-                // 获取图标URL
-                if (element.tagName.toLowerCase() === 'link') {
-                    iconUrl = element.href;
-                } else if (element.tagName.toLowerCase() === 'meta') {
-                    iconUrl = element.content;
-                }
-
-                // 获取图标尺寸
-                const sizes = element.getAttribute('sizes');
-                if (sizes) {
-                    // 处理类似 "32x32" 或 "any" 的尺寸
-                    const match = sizes.match(/(\d+)x(\d+)/);
-                    if (match) {
-                        size = parseInt(match[1]);
-                    } else if (sizes === 'any') {
-                        size = 192; // 假设 "any" 是大图
-                    }
-                } else {
-                    // 对于没有指定尺寸的图标，根据类型赋予默认尺寸
-                    if (element.rel) {
-                        if (element.rel.includes('apple-touch-icon')) {
-                            size = 180; // apple-touch-icon 通常是180x180
+    async getFaviconFromUrl(url) {
+        try {
+            const domain = new URL(url).hostname;
+            // 使用 chrome.runtime.sendMessage 获取图标
+            return new Promise((resolve) => {
+                chrome.runtime.sendMessage(
+                    { 
+                        action: 'getFavicon',
+                        domain: domain
+                    },
+                    (response) => {
+                        if (response && response.favicon) {
+                            resolve(response.favicon);
                         } else {
-                            size = 32; // 普通 favicon 通常是32x32
+                            resolve(this.generateDefaultIcon(domain));
                         }
                     }
-                }
-
-                if (iconUrl) {
-                    icons.push({ url: iconUrl, size: size });
-                }
+                );
             });
-        });
-
-        // 如果找到了图标，返回尺寸最大的那个
-        if (icons.length > 0) {
-            // 按尺寸降序排序
-            icons.sort((a, b) => b.size - a.size);
-            return icons[0].url;
+        } catch (error) {
+            console.error('Error fetching favicon:', error);
+            return this.generateDefaultIcon(new URL(url).hostname);
         }
-
-        // 如果没有找到何图标，使用 Google 的 favicon 服务作为后备
-        // 请求最大尺寸的图标 (128px)
-        return 'https://www.google.com/s2/favicons?sz=128&domain=' + window.location.hostname;
     }
 
     showContextMenu(e, index) {
@@ -586,12 +556,6 @@ class QuickTap {
         const currentIcon = this.popup.querySelector(`.app-icon[data-index="${this.currentAppIndex}"]`);
         const iconRect = currentIcon.getBoundingClientRect();
         
-        // 设置弹窗位置
-        this.editModal.style.position = 'fixed';
-        this.editModal.style.top = `${iconRect.bottom + 8}px`;
-        this.editModal.style.left = `${iconRect.left}px`;
-        this.editModal.style.transform = 'none';
-        
         const iconImg = this.editModal.querySelector('.edit-app-icon img');
         iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
         iconImg.src = app.favicon;
@@ -601,18 +565,53 @@ class QuickTap {
         
         titleInput.value = app.title;
         urlInput.value = app.url;
+
+        // 移除旧的事件监听器
+        if (urlInput._urlChangeHandler) {
+            urlInput.removeEventListener('input', urlInput._urlChangeHandler);
+        }
+
+        // 添加新的 URL 输入事件监听器
+        let timeoutId = null;
+        urlInput._urlChangeHandler = async () => {
+            // 清除之前的定时器
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+
+            // 设置新的定时器，延迟 300ms 执���
+            timeoutId = setTimeout(async () => {
+                const url = this.autoCompleteUrl(urlInput.value.trim());
+                if (url) {
+                    try {
+                        const favicon = await this.getFaviconFromUrl(url);
+                        iconImg.src = favicon;
+                    } catch (error) {
+                        console.error('Invalid URL:', error);
+                        iconImg.src = this.generateDefaultIcon(titleInput.value);
+                    }
+                }
+            }, 300);
+        };
+        urlInput.addEventListener('input', urlInput._urlChangeHandler);
+        
+        // 设置弹窗位置在图标右侧8px处，并且顶部对齐
+        this.editModal.style.position = 'fixed';
+        this.editModal.style.top = `${iconRect.top}px`;
+        this.editModal.style.left = `${iconRect.right + 8}px`;
+        this.editModal.style.transform = 'none';
         
         this.editModal.style.display = 'block';
-        this.contextMenu.style.display = 'none';  // 只隐藏右键菜单，不清除 currentAppIndex
+        this.contextMenu.style.display = 'none';
     }
 
     hideEditModal() {
         this.editModal.style.display = 'none';
-        // 移除 URL 输入事件监听器
+        // 清理 URL 输入事件监听器
         const urlInput = this.editModal.querySelector('.edit-url');
-        const oldListener = urlInput.onInput;
-        if (oldListener) {
-            urlInput.removeEventListener('input', oldListener);
+        if (urlInput && urlInput._urlChangeHandler) {
+            urlInput.removeEventListener('input', urlInput._urlChangeHandler);
+            urlInput._urlChangeHandler = null;
         }
         // 清除 currentAppIndex
         this.currentAppIndex = null;
@@ -641,13 +640,16 @@ class QuickTap {
                 if (!Array.isArray(apps)) {
                     apps = [];
                 }
+
+                // 压缩图标数据
+                const compressedFavicon = await this.compressImage(favicon);
     
                 if (this.currentAppIndex !== null && this.currentAppIndex < apps.length) {
                     // 更新现有应用
-                    apps[this.currentAppIndex] = { title, url, favicon };
+                    apps[this.currentAppIndex] = { title, url, favicon: compressedFavicon };
                 } else {
                     // 添加新应用
-                    apps.push({ title, url, favicon });
+                    apps.push({ title, url, favicon: compressedFavicon });
                 }
             
                 await chrome.storage.sync.set({ apps });
@@ -671,16 +673,21 @@ class QuickTap {
         canvas.height = 48;
         const ctx = canvas.getContext('2d');
         
-        // Draw dark gray background
+        // 绘制深色背景
         ctx.fillStyle = '#4A4A4A';
         ctx.fillRect(0, 0, 48, 48);
         
-        // Draw white letter
+        // 绘制白色字母
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const letter = (title || '?').charAt(0).toUpperCase();
+        
+        // 获取第一个非标点符号的字符
+        let letter = (title || '?').split('').find(char => /[A-Za-z0-9\u4e00-\u9fa5]/.test(char)) || '?';
+        if (/[a-z]/.test(letter)) {
+            letter = letter.toUpperCase();
+        }
         ctx.fillText(letter, 24, 24);
         
         return canvas.toDataURL();
@@ -731,6 +738,73 @@ class QuickTap {
                 console.error('Error saving app order:', error);
             }
         }
+    }
+
+    async compressImage(dataUrl, maxWidth = 128, maxHeight = 128) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';  // 添加跨域支持
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // 计算缩放比例
+                if (width > maxWidth || height > maxHeight) {
+                    const ratio = Math.min(maxWidth / width, maxHeight / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                
+                try {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                } catch (error) {
+                    // 如果出现跨域错误，尝试直接使用原始数据
+                    console.warn('Failed to compress image:', error);
+                    resolve(dataUrl);
+                }
+            };
+
+            img.onerror = () => {
+                // 如果加载失败，返回原始数据
+                console.warn('Failed to load image');
+                resolve(dataUrl);
+            };
+
+            // 对于已经是 base64 的数据，直接使用
+            if (dataUrl.startsWith('data:')) {
+                img.src = dataUrl;
+            } else {
+                // 对于外部URL，添加时间戳避免缓存
+                const timestamp = new Date().getTime();
+                img.src = `${dataUrl}${dataUrl.includes('?') ? '&' : '?'}t=${timestamp}`;
+            }
+        });
+    }
+
+    // 处理图片上传
+    handleImageUpload(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const compressedImage = await this.compressImage(e.target.result);
+                    const img = this.editModal.querySelector('.edit-app-icon img');
+                    img.src = compressedImage;
+                    resolve(compressedImage);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
 }
 
