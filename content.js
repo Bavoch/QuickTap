@@ -17,7 +17,7 @@ class QuickTap {
 
     init() {
         // Load shortcut settings
-        chrome.storage.local.get(['shortcut'], (result) => {
+        chrome.storage.sync.get(['shortcut'], (result) => {
             if (result.shortcut) {
                 this.shortcut = result.shortcut;
             }
@@ -386,7 +386,7 @@ class QuickTap {
         const appList = this.popup.querySelector('.app-list');
         appList.innerHTML = '';
         
-        // 先添加所有应用图标
+        // 先添加所有应��图标
         for (let i = 0; i < apps.length; i++) {
             const app = apps[i];
             // 确保应用有有效的图标
@@ -998,6 +998,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'toggle') {
         if (window.quickTap) {
             window.quickTap.togglePopup();
+        }
+    } else if (request.action === 'updateShortcut') {
+        if (window.quickTap) {
+            window.quickTap.shortcut = request.shortcut;
         }
     }
 });

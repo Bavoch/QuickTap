@@ -40,16 +40,16 @@
         .setting-group {
             margin-bottom: 20px;
             padding: 20px;
-            background: rgba(33, 33, 33, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #242424;
+            box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.05), 0px 2px 4px 0px rgba(0, 0, 0, 0.05);
             border-radius: 20px;
             width: 100%;
         }
 
         .setting-title {
             font-size: 14px;
-            font-weight: 400;
-            margin-bottom: 12px;
+            font-weight: 500;
+            margin-bottom: 16px;
             color: rgba(255, 255, 255, 0.5);
         }
 
@@ -66,14 +66,21 @@
             font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
             outline: none;
             box-sizing: border-box;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #shortcutInput:hover {
+            border-color: rgba(255, 255, 255, 0.4);
         }
 
         #shortcutInput:focus {
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
         }
 
-        #shortcutInput::placeholder {
-            color: rgba(255, 255, 255, 0.4);
+        #shortcutInput.recording {
+            background: rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.4);
         }
 
         .button-group {
@@ -121,11 +128,24 @@
             transform: translateY(0);
         }
 
-        .status {
-            margin-top: 12px;
-            color: #58E348;
-            font-size: 12px;
-            display: none;
+        .tips {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            color: #000000ce;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .tips.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
         }
     </style>
 </head>
@@ -139,13 +159,13 @@
     </div>
     <div class="setting-group">
         <div class="setting-title">快捷键</div>
-        <input type="text" id="shortcutInput" placeholder="请按键" readonly>
+        <input type="text" id="shortcutInput" placeholder="点击设置快捷键" readonly>
         <div class="button-group">
             <button id="saveButton">保存</button>
             <button id="resetButton">重置</button>
         </div>
-        <div id="status" class="status">设置已保存！</div>
     </div>
+    <div id="tips" class="tips"></div>
     <script src="options.js"></script>
 </body>
 </html>

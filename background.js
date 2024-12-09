@@ -3,10 +3,22 @@ chrome.action.onClicked.addListener((tab) => {
     chrome.tabs.sendMessage(tab.id, { action: 'toggle' });
 });
 
-// Listen for URL open requests
+// Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'openUrl') {
         chrome.tabs.create({ url: request.url });
+    } else if (request.action === 'updateShortcut') {
+        // 广播新的快捷键设置到所有标签页
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateShortcut',
+                    shortcut: request.shortcut
+                }).catch(() => {
+                    // 忽略不能发送消息的标签页
+                });
+            });
+        });
     } else if (request.action === 'getFavicon') {
         (async () => {
             try {
