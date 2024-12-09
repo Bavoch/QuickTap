@@ -353,7 +353,14 @@ class QuickTap {
         container.addEventListener('dragstart', (e) => {
             this.isDragging = true;
             container.classList.add('dragging');
+            
+            // Use both methods to ensure data transfer
             e.dataTransfer.setData('text/plain', index);
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Minimal prevention to allow our custom drag
+            e.stopPropagation(); 
+            
             setTimeout(() => {
                 container.style.opacity = '0.5';
             }, 0);
@@ -363,20 +370,28 @@ class QuickTap {
             this.isDragging = false;
             container.classList.remove('dragging');
             container.style.opacity = '1';
+            e.stopPropagation();
             const icons = this.popup.querySelectorAll('.app-icon');
             icons.forEach(icon => icon.classList.remove('drag-over'));
         });
 
         container.addEventListener('dragover', (e) => {
             e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.stopPropagation();
             container.classList.add('drag-over');
         });
 
         container.addEventListener('dragleave', (e) => {
+            e.stopPropagation();
             container.classList.remove('drag-over');
         });
 
-        container.addEventListener('drop', (e) => this.handleDrop(e, container));
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleDrop(e, container);
+        });
 
         return container;
     }
@@ -386,7 +401,7 @@ class QuickTap {
         const appList = this.popup.querySelector('.app-list');
         appList.innerHTML = '';
         
-        // 先添加所有应��图标
+        // 先添加所有应用图标
         for (let i = 0; i < apps.length; i++) {
             const app = apps[i];
             // 确保应用有有效的图标
