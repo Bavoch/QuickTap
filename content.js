@@ -199,8 +199,10 @@ class QuickTap {
             iconUpload.click();
         });
 
-        // 处理本地上传
-        this.editModal.querySelector('.upload').addEventListener('click', () => {
+        // 添加本地上传按钮的点击事件处理
+        this.editModal.querySelector('.upload').addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            const iconUpload = this.editModal.querySelector('#iconUpload');
             iconUpload.click();
             iconContextMenu.style.display = 'none';
         });
@@ -248,7 +250,8 @@ class QuickTap {
         });
 
         // Handle reset icon
-        this.editModal.querySelector('.reset').addEventListener('click', async () => {
+        this.editModal.querySelector('.reset').addEventListener('click', async (e) => {
+            e.stopPropagation();
             const urlInput = this.editModal.querySelector('.edit-url');
             const titleInput = this.editModal.querySelector('.edit-title');
             const img = this.editModal.querySelector('.edit-app-icon img');
@@ -353,9 +356,23 @@ class QuickTap {
         appList.innerHTML = '';
         
         // 先添加所有应用图标
-        apps.forEach((app, index) => {
-            appList.appendChild(this.createAppIcon(app, index));
-        });
+        for (let i = 0; i < apps.length; i++) {
+            const app = apps[i];
+            // 确保应用有有效的图标
+            if (!app.favicon || app.favicon === 'null' || app.favicon === 'undefined') {
+                try {
+                    app.favicon = await this.getFaviconFromUrl(app.url);
+                    // 更新存储中的图标
+                    const allApps = await this.getApps();
+                    allApps[i] = app;
+                    await chrome.storage.local.set({ apps: allApps });
+                } catch (error) {
+                    console.error('Error updating favicon:', error);
+                    app.favicon = this.generateDefaultIcon(app.title);
+                }
+            }
+            appList.appendChild(this.createAppIcon(app, i));
+        }
 
         // 添加"加用"按钮
         const addButton = document.createElement('div');
@@ -380,20 +397,36 @@ class QuickTap {
     async getFaviconFromUrl(url) {
         try {
             const domain = new URL(url).hostname;
-            const response = await new Promise(resolve => {
+            const response = await new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => reject(new Error('Timeout')), 3000); // 3秒超时
                 chrome.runtime.sendMessage({ 
                     action: 'getFavicon', 
                     domain: domain,
-                    url: url  // 添加完整URL以便后台获取当前标签页图标
-                }, resolve);
+                    url: url
+                }, (response) => {
+                    clearTimeout(timeoutId);
+                    resolve(response);
+                });
             });
             
             if (response && response.favicon) {
                 return response.favicon;
             }
-            
-            // 如果获取失败，返回默认图标
-            return this.generateDefaultIcon(domain);
+
+            // 如果获取失败，尝试使用 Google 的 favicon 服务
+            try {
+                const googleFaviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+                const response = await fetch(googleFaviconUrl);
+                const blob = await response.blob();
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+            } catch (error) {
+                console.error('Error getting Google favicon:', error);
+                return this.generateDefaultIcon(domain);
+            }
         } catch (error) {
             console.error('Error getting favicon:', error);
             return this.generateDefaultIcon(url);
@@ -423,7 +456,13 @@ class QuickTap {
         
         const iconImg = this.editModal.querySelector('.edit-app-icon img');
         iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
-        iconImg.src = app.favicon;
+        // 使用保存的图标或获取新图标
+        if (app.favicon && app.favicon !== 'null' && app.favicon !== 'undefined') {
+            iconImg.src = app.favicon;
+        } else {
+            const favicon = await this.getFaviconFromUrl(app.url);
+            iconImg.src = favicon;
+        }
         
         const titleInput = this.editModal.querySelector('.edit-title');
         const urlInput = this.editModal.querySelector('.edit-url');
@@ -438,27 +477,57 @@ class QuickTap {
 
         // 添加新的 URL 输入事件监听器
         let timeoutId = null;
+        let lastDomain = '';  // 用于跟踪域名变化
+
         urlInput._urlChangeHandler = async () => {
             // 清除之前的定时器
             if (timeoutId) {
                 clearTimeout(timeoutId);
             }
 
-            // 设置新的定时器，延迟 300ms 执���
-            timeoutId = setTimeout(async () => {
-                const url = this.autoCompleteUrl(urlInput.value.trim());
-                if (url) {
+            const url = this.autoCompleteUrl(urlInput.value.trim());
+            if (!url) {
+                iconImg.src = this.generateDefaultIcon(titleInput.value);
+                return;
+            }
+
+            try {
+                // 获取新的域名
+                const newDomain = new URL(url).hostname;
+                
+                // 如果域名没有变化，且已经有图标，则不需要更新
+                if (newDomain === lastDomain && iconImg.src && !iconImg.src.startsWith('data:image/png;base64,iVBOR')) {
+                    return;
+                }
+
+                // 设置 1 秒的延迟
+                timeoutId = setTimeout(async () => {
                     try {
+                        // 显示加载状态
+                        iconImg.style.opacity = '0.5';
+                        
+                        // 更新最后的域名
+                        lastDomain = newDomain;
+
+                        // 获取新图标
                         const favicon = await this.getFaviconFromUrl(url);
                         iconImg.src = favicon;
                     } catch (error) {
-                        console.error('Invalid URL:', error);
+                        console.error('Error fetching favicon:', error);
                         iconImg.src = this.generateDefaultIcon(titleInput.value);
+                    } finally {
+                        iconImg.style.opacity = '1';
                     }
-                }
-            }, 300);
+                }, 1000); // 1秒延迟
+            } catch (error) {
+                console.error('Invalid URL:', error);
+                iconImg.src = this.generateDefaultIcon(titleInput.value);
+            }
         };
+
+        // 同时监听 input 和 change 事件
         urlInput.addEventListener('input', urlInput._urlChangeHandler);
+        urlInput.addEventListener('change', urlInput._urlChangeHandler);
         
         // 设置弹窗位置在图标右侧8px处，并且顶部对齐
         this.editModal.style.position = 'fixed';
@@ -493,37 +562,48 @@ class QuickTap {
     async handleSaveEdit() {
         const titleInput = this.editModal.querySelector('.edit-title');
         const urlInput = this.editModal.querySelector('.edit-url');
-        const img = this.editModal.querySelector('.edit-app-icon img');
-    
+        const iconImg = this.editModal.querySelector('.edit-app-icon img');
+        
         const title = titleInput.value.trim();
-        const url = this.autoCompleteUrl(urlInput.value.trim());
-        const favicon = img.src;
-    
-        if (title && url) {
-            try {
-                let apps = await this.getApps();
-                if (!Array.isArray(apps)) {
-                    apps = [];
-                }
-
-                // 压缩图标数据
-                const compressedFavicon = await this.compressImage(favicon);
-    
-                if (this.currentAppIndex !== null && this.currentAppIndex < apps.length) {
-                    // 更新现有应用
-                    apps[this.currentAppIndex] = { title, url, favicon: compressedFavicon };
-                } else {
-                    // 添加新应用
-                    apps.push({ title, url, favicon: compressedFavicon });
-                }
-            
-                await chrome.storage.local.set({ apps });
-                await this.loadApps();
-                this.hideEditModal();
-            } catch (error) {
-                console.error('Error saving app:', error);
-            }
+        let url = urlInput.value.trim();
+        
+        if (!title || !url) {
+            console.error('Title and URL are required');
+            return;
         }
+        
+        // 自动补全 URL
+        url = this.autoCompleteUrl(url);
+        
+        // 获取当前显示的图标
+        const favicon = iconImg.src;
+        
+        // 获取当前应用列表
+        chrome.storage.local.get(['apps'], async (result) => {
+            const apps = result.apps || [];
+            
+            if (this.currentAppIndex !== null && this.currentAppIndex >= 0) {
+                // 更新现有应用
+                apps[this.currentAppIndex] = { 
+                    title, 
+                    url, 
+                    favicon  // 使用当前显示的图标
+                };
+            } else {
+                // 添加新应用
+                apps.push({ 
+                    title, 
+                    url, 
+                    favicon  // 使用当前显示的图标
+                });
+            }
+            
+            // 保存更新后的应用列表
+            chrome.storage.local.set({ apps }, () => {
+                this.hideEditModal();
+                this.loadApps(); // 重新加载应用列表
+            });
+        });
     }
 
     async saveApp(app) {
@@ -687,7 +767,7 @@ class QuickTap {
                     ctx.drawImage(img, 0, 0, width, height);
                     resolve(canvas.toDataURL('image/jpeg', 0.7));
                 } catch (error) {
-                    // 如果出现跨域错误，尝试直接使用原始数据
+                    // 果出现跨域错误，尝试直接使用原始数据
                     console.warn('Failed to compress image:', error);
                     resolve(dataUrl);
                 }
@@ -856,6 +936,24 @@ class QuickTap {
         } else {
             this.show();
         }
+    }
+
+    // 添加 URL 自动补全函数
+    autoCompleteUrl(url) {
+        if (!url) return '';
+        
+        // 如果已经是完整的 URL，直接返回
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+        }
+        
+        // 如果包含点号但不是完整 URL，添加 https://
+        if (url.includes('.')) {
+            return `https://${url}`;
+        }
+        
+        // 如果是简单域名，添加 .com 和 https://
+        return `https://${url}.com`;
     }
 }
 

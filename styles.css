@@ -12,8 +12,12 @@
     top: 300px;
     opacity: 0;
     visibility: hidden;
-    z-index: 999999;
+    z-index: 2147483645;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: auto;
+    min-height: auto;
+    line-height: normal;
+    text-align: left;
 }
 
 .quicktap-popup.visible {
@@ -42,6 +46,7 @@
     align-items: stretch;
     gap: 20px;
     transform-origin: top;
+    color: rgba(255, 255, 255, 0.90);
 }
 
 .quicktap-search-container {
@@ -57,17 +62,31 @@
     position: relative;
 }
 
-.quicktap-search {
+.quicktap-search[type="text"] {
     width: 100%;
     height: 100%;
     background: transparent;
     border: none;
     color: rgba(255, 255, 255, 0.90);
     font-size: 14px;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-weight: 400;
     outline: none;
     padding: 0;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+    line-height: normal;
+    text-transform: none;
+    text-align: left;
+    box-shadow: none;
+    border-radius: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    --tw-ring-offset-shadow: none;
+    --tw-ring-shadow: none;
+    --tw-shadow: none;
+    box-shadow: none;
+    outline: none;
 }
 
 .quicktap-search::placeholder {
@@ -188,7 +207,7 @@
 .context-menu,
 .icon-context-menu {
     position: fixed;
-    width: 90px;
+    width: 80px;
     background: rgba(33, 33, 33, 0.85);
     border-radius: 12px;
     box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
@@ -196,7 +215,7 @@
     border: 1px solid rgba(255, 255, 255, 0.10);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    z-index: 1000002;
+    z-index: 2147483647;
 }
 
 .icon-context-menu {
@@ -204,6 +223,8 @@
     left: calc(100% + 8px);
     top: 0;
     visibility: hidden;
+    z-index: 2147483647;
+    width: 90px;
 }
 
 .context-menu-item,
@@ -219,6 +240,11 @@
     border-radius: 8px;
     transition: background 0.2s;
     white-space: nowrap;
+    position: relative;
+    z-index: 2147483647;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .context-menu-item:hover,
@@ -241,16 +267,30 @@
     position: fixed;
     width: 240px;
     padding: 16px;
-    background: rgba(33, 33, 33, 0.85);
+    background: rgba(33, 33, 33, 0.95);
     border-radius: 20px;
     box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
     border: 1px solid rgba(255, 255, 255, 0.10);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    display: flex;
+    display: none;
     flex-direction: column;
-    z-index: 1000001;
+    z-index: 2147483647;
     overflow: visible;
+}
+
+.edit-app-modal[style*="display: block"],
+.edit-app-modal.visible {
+    display: flex;
+    pointer-events: auto;
+}
+
+/* 确保编辑模态框内的元素样式正确 */
+.edit-app-modal .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
 }
 
 .edit-app-modal h3 {
@@ -261,42 +301,37 @@
     margin: 0;
 }
 
-.edit-app-modal .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
 .edit-app-modal .buttons {
     display: flex;
     gap: 8px;
 }
 
-.edit-app-modal .save-btn {
+.edit-app-modal .save-btn,
+.edit-app-modal .cancel-btn {
     padding: 4px 12px;
-    background: #58E348;
-    color: #0B4E10;
     border-radius: 8px;
     border: 1px solid rgba(0, 0, 0, 0.10);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    transition: all 0.2s ease;
+    user-select: none;
+    pointer-events: auto;
+}
+
+.edit-app-modal .save-btn {
+    background: #58E348;
+    color: #0B4E10;
 }
 
 .edit-app-modal .save-btn:hover {
-    background: #69F459;
+    background: #30ba20;
 }
 
 .edit-app-modal .cancel-btn {
-    padding: 4px 12px;
     background: rgba(255, 255, 255, 0.10);
     color: white;
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.10);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
 }
 
 .edit-app-modal .cancel-btn:hover {
@@ -338,10 +373,9 @@
 .edit-app-modal .name-input-container input {
     flex: 1;
 }
-
 .edit-app-icon {
     position: relative;
-    overflow: visible !important;
+    overflow: visible;
     width: 36px;
     height: 36px;
     border-radius: 12px;
@@ -353,9 +387,6 @@
     transition: all 0.2s ease;
 }
 
-.edit-app-icon:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
 
 .edit-app-icon img {
     width: 36px;
@@ -434,4 +465,9 @@
         opacity: 1;
         transform: translate(-50%, 0);
     }
+}
+
+.icon-context-menu.visible {
+    visibility: visible ;
+    pointer-events: auto ;
 }
