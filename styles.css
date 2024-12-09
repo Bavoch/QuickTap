@@ -8,12 +8,12 @@
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.98);
+    transform: translate(-50%, -50%) scale(0.99);
     top: 300px;
     opacity: 0;
     visibility: hidden;
     z-index: 2147483645;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.1s ease, transform 0.3s cubic-bezier(.39,0,.26,1);
     min-width: auto;
     min-height: auto;
     line-height: normal;
@@ -46,16 +46,15 @@
     align-items: stretch;
     gap: 20px;
     transform-origin: top;
-    color: rgba(255, 255, 255, 0.90);
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .quicktap-search-container {
     width: 100%;
     height: 48px;
-    padding: 4px 4px 4px 12px;
-    background: rgba(0, 0, 0, 0.40);
+    padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.30);
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -73,8 +72,6 @@
     outline: none;
     padding: 0;
     margin: 0;
-    min-width: 0;
-    min-height: 0;
     line-height: normal;
     text-transform: none;
     text-align: left;
@@ -90,7 +87,7 @@
 }
 
 .quicktap-search::placeholder {
-    color: rgba(255, 255, 255, 0.40);
+    color: rgba(255, 255, 255, 0.20);
 }
 
 .quicktap-apps {
@@ -205,17 +202,22 @@
 
 /* Context menu styles */
 .context-menu,
-.icon-context-menu {
-    position: fixed;
-    width: 80px;
-    background: rgba(33, 33, 33, 0.85);
+.icon-context-menu,
+.edit-app-modal {
+    background: rgba(33, 33, 33, 0.9);
     border-radius: 12px;
     box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
-    padding: 4px;
     border: 1px solid rgba(255, 255, 255, 0.10);
     backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px) ;
     z-index: 2147483647;
+}
+
+.context-menu,
+.icon-context-menu {
+    position: fixed;
+    width: 90px;
+    padding: 4px;
 }
 
 .icon-context-menu {
@@ -223,8 +225,6 @@
     left: calc(100% + 8px);
     top: 0;
     visibility: hidden;
-    z-index: 2147483647;
-    width: 90px;
 }
 
 .context-menu-item,
@@ -234,9 +234,8 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    color: rgba(255, 255, 255, 0.90);
+    color: rgba(255, 255, 255, 0.70);
     font-size: 12px;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     border-radius: 8px;
     transition: background 0.2s;
     white-space: nowrap;
@@ -249,7 +248,8 @@
 
 .context-menu-item:hover,
 .icon-context-menu .context-menu-item:hover {
-    background: rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.90);
 }
 
 .context-menu-item.delete,
@@ -267,15 +267,9 @@
     position: fixed;
     width: 240px;
     padding: 16px;
-    background: rgba(33, 33, 33, 0.95);
-    border-radius: 20px;
-    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
     display: none;
     flex-direction: column;
-    z-index: 2147483647;
     overflow: visible;
 }
 
@@ -296,7 +290,6 @@
 .edit-app-modal h3 {
     color: rgba(255, 255, 255, 0.50);
     font-size: 12px;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-weight: 400;
     margin: 0;
 }
@@ -314,19 +307,18 @@
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     transition: all 0.2s ease;
     user-select: none;
     pointer-events: auto;
 }
 
 .edit-app-modal .save-btn {
-    background: #58E348;
-    color: #0B4E10;
+    background: #1D5039;
+    color: #ffffff;
 }
 
 .edit-app-modal .save-btn:hover {
-    background: #30ba20;
+    background: #144630;
 }
 
 .edit-app-modal .cancel-btn {
@@ -354,7 +346,6 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.90);
     font-size: 12px;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-weight: 400;
     outline: none;
 }
@@ -467,7 +458,15 @@
     }
 }
 
-.icon-context-menu.visible {
-    visibility: visible ;
-    pointer-events: auto ;
+
+/* Reset styles for plugin elements */
+.quicktap-popup,
+.quicktap-popup *,
+.context-menu,
+.context-menu *,
+.icon-context-menu,
+.icon-context-menu *,
+.edit-app-modal,
+.edit-app-modal * {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
 }

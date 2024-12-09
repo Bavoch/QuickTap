@@ -29,7 +29,7 @@ class QuickTap {
         this.popup.innerHTML = `
             <div class="quicktap-container">
                 <div class="quicktap-search-container">
-                    <input type="text" class="quicktap-search" placeholder="搜索、翻译或输入网址">
+                    <input type="text" class="quicktap-search" placeholder="Enter 搜索，Shift Enter 翻译">
                     <div class="loading-spinner"></div>
                 </div>
                 <div class="quicktap-apps">
@@ -108,6 +108,7 @@ class QuickTap {
             const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
             const isContextMenuVisible = contextMenu.style.display === 'block';
             const isIconContextMenuVisible = iconContextMenu && iconContextMenu.style.display === 'block';
+            const isEditModalVisible = this.editModal.style.display === 'block';
 
             // 如果点击的是右键菜单区域，不做任何处理
             if (contextMenu.contains(e.target) || 
@@ -124,6 +125,12 @@ class QuickTap {
                     iconContextMenu.style.display = 'none';
                 }
                 e.stopPropagation();
+                return;
+            }
+
+            // 如果编辑弹窗显示，且点击在弹窗外部，则关闭弹窗
+            if (isEditModalVisible && !this.editModal.contains(e.target)) {
+                this.hideEditModal();
                 return;
             }
 
@@ -249,7 +256,8 @@ class QuickTap {
         });
 
         // Handle paste replace
-        this.editModal.querySelector('.paste').addEventListener('click', async () => {
+        this.editModal.querySelector('.paste').addEventListener('click', async (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
             try {
                 const clipboardItems = await navigator.clipboard.read();
                 for (const clipboardItem of clipboardItems) {

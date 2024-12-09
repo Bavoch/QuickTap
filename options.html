@@ -12,61 +12,115 @@
             background: #1A1A1A;
             color: rgba(255, 255, 255, 0.9);
         }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            color: #58E348;
+        }
+
         h1 {
             font-size: 16px;
             font-weight: 500;
-            margin-bottom: 24px;
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0;
         }
+
         .setting-group {
             margin-bottom: 20px;
-            padding: 16px;
-            background: rgba(33, 33, 33, 0.85);
+            padding: 20px;
+            background: rgba(33, 33, 33, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 20px;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            width: 100%;
         }
+
         .setting-title {
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 400;
             margin-bottom: 12px;
             color: rgba(255, 255, 255, 0.5);
         }
-        p {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 16px;
-        }
+
         #shortcutInput {
-            padding: 8px;
-            width: 200px;
-            margin-right: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 8px;
+            width: 100%;
+            height: 40px;
+            padding: 0 16px;
+            margin-bottom: 16px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
             color: rgba(255, 255, 255, 0.9);
-            font-size: 12px;
+            font-size: 14px;
             font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
             outline: none;
+            box-sizing: border-box;
         }
+
+        #shortcutInput:focus {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
         #shortcutInput::placeholder {
             color: rgba(255, 255, 255, 0.4);
         }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+
         button {
-            padding: 4px 12px;
-            background: #58E348;
-            color: #0B4E10;
-            border: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 6px 14px;
             border-radius: 8px;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            transition: all 0.2s ease;
         }
-        button:hover {
-            background: #69F459;
+
+        #saveButton {
+            background: #1D5039;
+            color: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
         }
+
+        #saveButton:hover {
+            background: #144630;
+            transform: translateY(-1px);
+        }
+
+        #saveButton:active {
+            transform: translateY(0);
+        }
+
+        #resetButton {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #resetButton:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        #resetButton:active {
+            transform: translateY(0);
+        }
+
         .status {
             margin-top: 12px;
             color: #58E348;
@@ -76,12 +130,20 @@
     </style>
 </head>
 <body>
-    <h1>QuickTap 设置</h1>
+    <div class="header">
+        <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16.0355 2.41422L29.5355 15.9142L16.0355 29.4142L2.53553 15.9142L16.0355 2.41422Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M16.0355 8.41422L23.5355 15.9142L16.0355 23.4142L8.53553 15.9142L16.0355 8.41422Z" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h1>QuickTap 设置</h1>
+    </div>
     <div class="setting-group">
-        <div class="setting-title">激活快捷键</div>
-        <p>按下所需的按键或组合键，然后点击保存。默认为 'Z'。</p>
+        <div class="setting-title">快捷键</div>
         <input type="text" id="shortcutInput" placeholder="请按键" readonly>
-        <button id="saveButton">保存</button>
+        <div class="button-group">
+            <button id="saveButton">保存</button>
+            <button id="resetButton">重置</button>
+        </div>
         <div id="status" class="status">设置已保存！</div>
     </div>
     <script src="options.js"></script>
