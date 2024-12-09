@@ -103,11 +103,34 @@ class QuickTap {
 
         // Add click event listener to close popup when clicking outside
         document.addEventListener('click', (e) => {
+            // 检查是否有右键菜单显示
+            const contextMenu = this.contextMenu;
+            const iconContextMenu = this.editModal.querySelector('.icon-context-menu');
+            const isContextMenuVisible = contextMenu.style.display === 'block';
+            const isIconContextMenuVisible = iconContextMenu && iconContextMenu.style.display === 'block';
+
+            // 如果点击的是右键菜单区域，不做任何处理
+            if (contextMenu.contains(e.target) || 
+                (iconContextMenu && iconContextMenu.contains(e.target)) ||
+                e.target.closest('.app-icon') ||
+                e.target.closest('.edit-app-icon')) {
+                return;
+            }
+
+            // 如果有右键菜单显示，则只关闭右键菜单
+            if (isContextMenuVisible || isIconContextMenuVisible) {
+                this.hideContextMenu();
+                if (iconContextMenu) {
+                    iconContextMenu.style.display = 'none';
+                }
+                e.stopPropagation();
+                return;
+            }
+
+            // 如果点击的是弹窗外区域，且没有右键菜单显示，则关闭整个插件
             if (this.popup.classList.contains('visible') && 
                 !this.popup.contains(e.target) && 
-                !this.editModal.contains(e.target) && 
-                !this.contextMenu.contains(e.target)) {
-                this.hideEditModal();
+                !this.editModal.contains(e.target)) {
                 this.hideContextMenu();
                 this.togglePopup();
             }
