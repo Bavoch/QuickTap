@@ -75,12 +75,12 @@
         }
 
         #shortcutInput:focus {
-            border-color: rgba(255, 255, 255, 0.4);
+            border: 2px solid  #1D5039;
         }
 
         #shortcutInput.recording {
-            background: rgba(0, 0, 0, 0.5);
-            border-color: rgba(255, 255, 255, 0.4);
+            border-color: #1D5039;
+            color: #ffffff37;
         }
 
         .button-group {
@@ -133,11 +133,11 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            color: #000000ce;
-            padding: 8px 16px;
+            background: rgb(50, 50, 50);
+            color: #ffffff;
+            padding: 6px 12px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 14px;
             opacity: 0;
             transition: all 0.3s ease;
             pointer-events: none;
@@ -159,7 +159,7 @@
     </div>
     <div class="setting-group">
         <div class="setting-title">快捷键</div>
-        <input type="text" id="shortcutInput" placeholder="点击设置快捷键" readonly>
+        <input type="text" id="shortcutInput" placeholder="点击设置快捷键" readonly ">
         <div class="button-group">
             <button id="saveButton">保存</button>
             <button id="resetButton">重置</button>

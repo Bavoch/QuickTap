@@ -1,4 +1,12 @@
-*, *::before, *::after {
+/* Reset styles only for plugin elements */
+.quicktap-popup,
+.quicktap-popup *,
+.context-menu,
+.context-menu *,
+.icon-context-menu,
+.icon-context-menu *,
+.edit-app-modal,
+.edit-app-modal * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -18,6 +26,7 @@
     min-height: auto;
     line-height: normal;
     text-align: left;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .quicktap-popup.visible {
@@ -459,7 +468,7 @@
 }
 
 
-/* Reset styles for plugin elements */
+/* Remove global font override */
 .quicktap-popup,
 .quicktap-popup *,
 .context-menu,
@@ -468,5 +477,5 @@
 .icon-context-menu *,
 .edit-app-modal,
 .edit-app-modal * {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
