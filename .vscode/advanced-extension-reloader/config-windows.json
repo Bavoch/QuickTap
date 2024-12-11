@@ -4,6 +4,3 @@
     "extension_id": "apelbgllgfnmoponbhdionfgjgaggbng", 
     "play_notifications": false
 }
-
-  git config --global user.email "you@example.com"
-  git config --global user.name "Your Name"
