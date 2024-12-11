@@ -1,4 +1,10 @@
-/* Reset styles only for plugin elements */
+/* 为所有插件元素添加命名空间前缀 */
+.quicktap-extension {
+    all: initial;
+}
+
+
+/* 重置插件元素的样式 */
 .quicktap-popup,
 .quicktap-popup *,
 .context-menu,
@@ -10,6 +16,26 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    pointer-events: auto;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+/* 添加一个遮罩层来阻止事件穿透 */
+.quicktap-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 2147483644;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.quicktap-overlay.visible {
+    pointer-events: auto;
+    visibility: visible;
 }
 
 .quicktap-popup {
@@ -26,7 +52,7 @@
     min-height: auto;
     line-height: normal;
     text-align: left;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    pointer-events: auto;
 }
 
 .quicktap-popup.visible {
@@ -387,7 +413,6 @@
     transition: all 0.2s ease;
 }
 
-
 .edit-app-icon img {
     width: 36px;
     height: 36px;
@@ -400,10 +425,6 @@
 .app-icon.dragging {
     opacity: 0.5;
     transform: scale(1.05);
-}
-
-.app-icon.drag-over {
-    border-color: #4285f4;
 }
 
 .loading-spinner {
@@ -425,7 +446,7 @@
     content: '';
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
     border-top-color: rgba(255, 255, 255, 0.7);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -465,17 +486,4 @@
         opacity: 1;
         transform: translate(-50%, 0);
     }
-}
-
-
-/* Remove global font override */
-.quicktap-popup,
-.quicktap-popup *,
-.context-menu,
-.context-menu *,
-.icon-context-menu,
-.icon-context-menu *,
-.edit-app-modal,
-.edit-app-modal * {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }

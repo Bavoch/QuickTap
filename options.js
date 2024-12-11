@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', function() {
     const shortcutInput = document.getElementById('shortcutInput');
     const saveButton = document.getElementById('saveButton');
     const resetButton = document.getElementById('resetButton');
@@ -23,16 +23,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         JSON.stringify({ key: 't', ctrl: true, alt: false, shift: false }),
     ]);
 
-    // 加载保存的快捷键
-    try {
-        const result = await chrome.storage.sync.get(['shortcut']);
+    // 先显示默认快捷键
+    updateShortcutDisplay();
+
+    // 异步加载保存的快捷键
+    chrome.storage.sync.get(['shortcut'], function(result) {
         if (result.shortcut) {
             currentShortcut = result.shortcut;
             updateShortcutDisplay();
         }
-    } catch (error) {
-        console.error('Failed to load shortcut:', error);
-    }
+    });
 
     // 开始记录快捷键
     shortcutInput.addEventListener('focus', function() {
@@ -101,34 +101,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // 保存设置
-    saveButton.addEventListener('click', async function() {
-        try {
-            await chrome.storage.sync.set({ shortcut: currentShortcut });
+    saveButton.addEventListener('click', function() {
+        chrome.storage.sync.set({ shortcut: currentShortcut }, function() {
+            if (chrome.runtime.lastError) {
+                console.error('Failed to save shortcut:', chrome.runtime.lastError);
+                showTips('保存失败');
+                return;
+            }
+
             chrome.runtime.sendMessage({
                 action: 'updateShortcut',
                 shortcut: currentShortcut
             });
             showTips('已保存');
-        } catch (error) {
-            console.error('Failed to save shortcut:', error);
-            showTips('保存失败');
-        }
+        });
     });
 
     // 重置设置
-    resetButton.addEventListener('click', async function() {
+    resetButton.addEventListener('click', function() {
         currentShortcut = { ...defaultShortcut };
         updateShortcutDisplay();
-        try {
-            await chrome.storage.sync.set({ shortcut: currentShortcut });
+        
+        chrome.storage.sync.set({ shortcut: currentShortcut }, function() {
+            if (chrome.runtime.lastError) {
+                console.error('Failed to reset shortcut:', chrome.runtime.lastError);
+                showTips('重置失败');
+                return;
+            }
+
             chrome.runtime.sendMessage({
                 action: 'updateShortcut',
                 shortcut: currentShortcut
             });
             showTips('已重置');
-        } catch (error) {
-            console.error('Failed to reset shortcut:', error);
-            showTips('重置失败');
-        }
+        });
     });
 });

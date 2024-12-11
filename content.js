@@ -16,6 +16,11 @@ class QuickTap {
     }
 
     init() {
+        // Create overlay
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'quicktap-overlay quicktap-extension';
+        document.body.appendChild(this.overlay);
+
         // Load shortcut settings
         chrome.storage.sync.get(['shortcut'], (result) => {
             if (result.shortcut) {
@@ -25,7 +30,7 @@ class QuickTap {
 
         // Create popup container
         this.popup = document.createElement('div');
-        this.popup.className = 'quicktap-popup';
+        this.popup.className = 'quicktap-popup quicktap-extension';
         this.popup.innerHTML = `
             <div class="quicktap-container">
                 <div class="quicktap-search-container">
@@ -46,7 +51,7 @@ class QuickTap {
 
         // Create context menu
         this.contextMenu = document.createElement('div');
-        this.contextMenu.className = 'context-menu';
+        this.contextMenu.className = 'context-menu quicktap-extension';
         this.contextMenu.style.display = 'none';
         this.contextMenu.innerHTML = `
             <div class="context-menu-item edit">
@@ -59,7 +64,7 @@ class QuickTap {
 
         // Create edit modal
         this.editModal = document.createElement('div');
-        this.editModal.className = 'edit-app-modal';
+        this.editModal.className = 'edit-app-modal quicktap-extension';
         this.editModal.style.display = 'none';
         this.editModal.innerHTML = `
             <div class="header">
