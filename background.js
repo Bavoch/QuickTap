@@ -41,7 +41,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             reader.readAsDataURL(blob);
                             return;
                         } catch (error) {
-                            console.error('Error fetching tab favicon:', error);
+                            console.error('Error fetching tab favicon:', error, response?.status);
                             // 如果获取失败，继续尝试其他方法
                         }
                     }
