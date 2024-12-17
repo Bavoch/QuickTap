@@ -1,4 +1,4 @@
-<img src="icon.png" width="64" height="64" alt="QuickTap Logo" align="left" style="margin-right: 20px;">
+<img src="icons/icon128.png" width="64" height="64" alt="QuickTap Logo" align="left" style="margin-right: 20px;">
 
 ```
 
