@@ -6,13 +6,21 @@ class QuickTap {
         this.contextMenu = null;
         this.editModal = null;
         this.currentAppIndex = null;
-        this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false };
+        this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false, command: false };
         this.isDragging = false;
         this.loadingSpinner = null;
         this.init();
 
         // Make instance available globally for error handling
         window.quickTap = this;
+
+        // Listen for changes in chrome.storage
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (namespace === 'local' && changes.apps) {
+                // Reload apps when the storage changes
+                this.loadApps();
+            }
+        });
     }
 
     init() {
@@ -170,11 +178,12 @@ class QuickTap {
                 return;
             }
             
-            // Check if the pressed keys match the shortcut
+            // Check if the pressed keys match the custom shortcut
             if (e.key.toLowerCase() === this.shortcut.key &&
                 e.ctrlKey === this.shortcut.ctrl &&
                 e.altKey === this.shortcut.alt &&
-                e.shiftKey === this.shortcut.shift) {
+                e.shiftKey === this.shortcut.shift &&
+                e.metaKey === this.shortcut.command) {
                 e.preventDefault();
                 this.togglePopup();
             }
