@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
     shortcutInput.addEventListener('focus', function() {
         isRecording = true;
         shortcutInput.classList.add('recording');
-        shortcutInput.value = '请按下快捷键';
+        shortcutInput.value = 'Press the shortcut key';
     });
 
     // 停止记录快捷键
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         if (isDisabledShortcut(newShortcut)) {
-            showTips('此快捷键组合不可用');
+            showTips('This shortcut combination is not available');
             return;
         }
 
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.sync.set({ shortcut: currentShortcut }, function() {
             if (chrome.runtime.lastError) {
                 console.error('Failed to save shortcut:', chrome.runtime.lastError);
-                showTips('保存失败');
+                showTips('Save failed');
                 return;
             }
 
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 action: 'updateShortcut',
                 shortcut: currentShortcut
             });
-            showTips('已保存');
+            showTips('Saved');
         });
     });
 
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.sync.set({ shortcut: currentShortcut }, function() {
             if (chrome.runtime.lastError) {
                 console.error('Failed to reset shortcut:', chrome.runtime.lastError);
-                showTips('重置失败');
+                showTips('Reset failed');
                 return;
             }
 
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 action: 'updateShortcut',
                 shortcut: currentShortcut
             });
-            showTips('已重置');
+            showTips('Reset');
         });
     });
 });
