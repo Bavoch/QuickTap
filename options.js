@@ -24,8 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ]);
 
     // 先显示默认快捷键
-    updateShortcutDisplay();
-
+    
     // 异步加载保存的快捷键
     chrome.storage.sync.get(['shortcut'], function(result) {
         if (result.shortcut) {
@@ -33,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateShortcutDisplay();
         }
     });
+    updateShortcutDisplay();
 
     // 开始记录快捷键
     shortcutInput.addEventListener('focus', function() {
