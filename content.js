@@ -9,6 +9,7 @@ class QuickTap {
         this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false, command: false };
         this.isDragging = false;
         this.loadingSpinner = null;
+        this.dragGuideLine = null;
         this.init();
 
         // Make instance available globally for error handling
@@ -56,6 +57,11 @@ class QuickTap {
                 </div>
             </div>
         `;
+        
+        // Create drag guide line
+        this.dragGuideLine = document.createElement('div');
+        this.dragGuideLine.className = 'drag-guide-line quicktap-extension';
+        document.body.appendChild(this.dragGuideLine);
 
         // Create context menu
         this.contextMenu = document.createElement('div');
@@ -378,6 +384,9 @@ class QuickTap {
             setTimeout(() => {
                 container.style.opacity = '0.5';
             }, 0);
+            
+            // Hide guide line initially
+            this.dragGuideLine.style.display = 'none';
         });
 
         container.addEventListener('dragend', (e) => {
@@ -387,6 +396,9 @@ class QuickTap {
             e.stopPropagation();
             const icons = this.popup.querySelectorAll('.app-icon');
             icons.forEach(icon => icon.classList.remove('drag-over'));
+            
+            // Hide guide line when drag ends
+            this.dragGuideLine.style.display = 'none';
         });
 
         container.addEventListener('dragover', (e) => {
@@ -394,11 +406,17 @@ class QuickTap {
             e.dataTransfer.dropEffect = 'move';
             e.stopPropagation();
             container.classList.add('drag-over');
+            
+            // Show and position guide line
+            this.showGuideLineAt(container);
         });
 
         container.addEventListener('dragleave', (e) => {
             e.stopPropagation();
             container.classList.remove('drag-over');
+            
+            // Don't hide the guide line here as it would flicker when moving between icons
+            // The guide line will be repositioned on the next dragover event
         });
 
         container.addEventListener('drop', (e) => {
@@ -410,6 +428,45 @@ class QuickTap {
         return container;
     }
 
+    // Show guide line at the target container position
+    showGuideLineAt(container) {
+        if (!container || !this.isDragging) return;
+        
+        // Get the currently dragged element
+        const draggedElement = this.popup.querySelector('.app-icon.dragging');
+        if (!draggedElement) return;
+        
+        const draggedIndex = parseInt(draggedElement.dataset.index);
+        const targetIndex = parseInt(container.dataset.index);
+        
+        // Don't show guide line if dragging onto itself
+        if (draggedIndex === targetIndex) {
+            this.dragGuideLine.style.display = 'none';
+            return;
+        }
+        
+        const rect = container.getBoundingClientRect();
+        const appList = this.popup.querySelector('.app-list');
+        const appListRect = appList.getBoundingClientRect();
+        
+        // Determine position based on drag direction
+        let leftPosition;
+        
+        if (draggedIndex < targetIndex) {
+            // Dragging forward - show guide line at the right edge
+            leftPosition = rect.right + 8;
+        } else {
+            // Dragging backward - show guide line at the left edge
+            leftPosition = rect.left - 8;
+        }
+        
+        // Position the guide line
+        this.dragGuideLine.style.display = 'block';
+        this.dragGuideLine.style.height = `${appListRect.height}px`;
+        this.dragGuideLine.style.top = `${appListRect.top}px`;
+        this.dragGuideLine.style.left = `${leftPosition}px`;
+    }
+    
     async loadApps() {
         const apps = await this.getApps();
         const appList = this.popup.querySelector('.app-list');
@@ -778,6 +835,9 @@ class QuickTap {
     async handleDrop(e, container) {
         e.preventDefault();
         container.classList.remove('drag-over');
+        
+        // Hide the guide line when drop occurs
+        this.dragGuideLine.style.display = 'none';
         
         const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
         const toIndex = parseInt(container.dataset.index);

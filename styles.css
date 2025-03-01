@@ -430,6 +430,26 @@
     transform: scale(1.05);
 }
 
+/* Drag guide line styles */
+.drag-guide-line {
+    position: absolute;
+    width: 2px;
+    height: 40px;
+    background: rgba(53, 106, 229, 0.8);
+    border-radius: 2px;
+    z-index: 2147483646;
+    pointer-events: none;
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+    transition: transform 0.1s ease;
+    display: none;
+}
+
+
+.app-icon.drag-over {
+    position: relative;
+    z-index: 1;
+}
+
 .loading-spinner {
     position: absolute;
     width: 16px;
