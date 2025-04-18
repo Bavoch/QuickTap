@@ -478,7 +478,14 @@ class QuickTap {
             if (!this.isDragging) {
                 // 检查chrome API是否可用
                 if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-                    console.warn('Chrome runtime API not available, cannot open URL');
+                    console.warn('Chrome runtime API not available, opening URL directly');
+                    // 如果API不可用，直接打开URL
+                    try {
+                        window.open(app.url, '_blank');
+                    } catch (error) {
+                        console.error('Error opening URL directly:', error);
+                    }
+                    e.preventDefault();
                     return;
                 }
 
@@ -492,13 +499,21 @@ class QuickTap {
                         if (chrome.runtime.lastError) {
                             console.warn('Error opening URL:', chrome.runtime.lastError);
                             // 如果出错，尝试直接打开URL
-                            window.open(app.url, '_blank');
+                            try {
+                                window.open(app.url, '_blank');
+                            } catch (openError) {
+                                console.error('Error opening URL after sendMessage error:', openError);
+                            }
                         }
                     });
                 } catch (error) {
                     console.error('Error sending message to open URL:', error);
                     // 如果出错，尝试直接打开URL
-                    window.open(app.url, '_blank');
+                    try {
+                        window.open(app.url, '_blank');
+                    } catch (openError) {
+                        console.error('Error opening URL after catch:', openError);
+                    }
                 }
                 // 不再关闭侧边栏
             }
@@ -1367,16 +1382,31 @@ class QuickTap {
             try {
                 // 检查chrome API是否可用
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    chrome.runtime.sendMessage({ action: 'getOpenTabs' }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            console.warn('Error getting open tabs:', chrome.runtime.lastError);
+                    try {
+                        // 设置超时处理
+                        const timeoutId = setTimeout(() => {
+                            console.warn('getOpenTabs request timed out');
                             resolve([]);
-                            return;
-                        }
-                        resolve(response && response.tabs ? response.tabs : []);
-                    });
+                        }, 2000); // 2秒超时
+
+                        chrome.runtime.sendMessage({ action: 'getOpenTabs' }, (response) => {
+                            clearTimeout(timeoutId); // 清除超时定时器
+
+                            if (chrome.runtime.lastError) {
+                                // 将错误级别从 warn 降低到 info，因为这不是严重错误
+                                console.info('Note: Error getting open tabs:', chrome.runtime.lastError.message || 'Unknown error');
+                                resolve([]);
+                                return;
+                            }
+                            resolve(response && response.tabs ? response.tabs : []);
+                        });
+                    } catch (sendError) {
+                        console.info('Note: Could not send message to get open tabs:', sendError.message || sendError);
+                        resolve([]);
+                    }
                 } else {
-                    console.warn('Chrome runtime API not available');
+                    // 将错误级别从 warn 降低到 info，因为这不是严重错误
+                    console.info('Note: Chrome runtime API not available for getting open tabs');
                     resolve([]);
                 }
             } catch (error) {
@@ -1674,29 +1704,35 @@ class QuickTap {
 })()
 
 // 检查chrome API是否可用
-if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-    // Handle extension messages
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        try {
-            // 检查请求和quickTap实例是否存在
-            if (!request || !window.quickTap) {
-                return;
-            }
+try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+        // Handle extension messages
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            try {
+                // 检查请求和quickTap实例是否存在
+                if (!request || !window.quickTap) {
+                    return;
+                }
 
-            // 不再切换侧边栏显示状态
-            // if (request.action === 'toggle') {
-            //     window.quickTap.togglePopup();
-            // } else
-            if (request.action === 'updateShortcut') {
-                window.quickTap.shortcut = request.shortcut;
-            } else if (request.action === 'tabsChanged') {
-                // 标签页变化时更新图标状态
-                window.quickTap.updateActiveStatus();
+                // 不再切换侧边栏显示状态
+                // if (request.action === 'toggle') {
+                //     window.quickTap.togglePopup();
+                // } else
+                if (request.action === 'updateShortcut') {
+                    window.quickTap.shortcut = request.shortcut;
+                } else if (request.action === 'tabsChanged') {
+                    // 标签页变化时更新图标状态
+                    window.quickTap.updateActiveStatus();
+                }
+            } catch (error) {
+                console.error('Error handling extension message:', error);
             }
-        } catch (error) {
-            console.error('Error handling extension message:', error);
-        }
-    });
-} else {
-    console.warn('Chrome runtime API not available, message listener not added');
+        });
+        console.info('Chrome runtime message listener added successfully');
+    } else {
+        // 将错误级别从 warn 降低到 info，因为这不是严重错误
+        console.info('Note: Chrome runtime API not available, message listener not added');
+    }
+} catch (error) {
+    console.info('Note: Error setting up message listener:', error.message || error);
 }
