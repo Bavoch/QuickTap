@@ -41,13 +41,12 @@
 .quicktap-popup {
     position: fixed;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.99);
-    top: 300px;
+    left: 20px;
+    transform: translateY(-50%) scale(0.99);
     opacity: 0;
     visibility: hidden;
     z-index: 2147483645;
-    transition: opacity 0.1s ease, transform 0.3s cubic-bezier(.39,0,.26,1);
+    transition: opacity 0.15s ease, transform 0.3s cubic-bezier(.39,0,.26,1);
     min-width: auto;
     min-height: auto;
     line-height: normal;
@@ -58,82 +57,52 @@
 .quicktap-popup.visible {
     opacity: 1;
     visibility: visible;
-    transform: translate(-50%, calc(-50% - 2px)) scale(1);
+    transform: translateY(-50%) scale(1);
 }
 
+/* 侧边栏隐藏按钮已移除 */
+
 .quicktap-container {
-    width: 590px;
+    width: 64px;
     height: auto;
-    min-height: 144px;
+    min-height: 300px;
     max-height: 80vh;
-    padding: 20px;
-    background: rgba(33, 33, 33, 0.9);
-    box-shadow: 0px 4px 4px 0px rgba(255, 255, 255, 0.05) inset, 
-                0px 0px 12px 0px rgba(255, 255, 255, 0.08) inset, 
-                0px 5px 50px 0px rgba(0, 0, 0, 0.80);
-    border-radius: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    padding: 20px 12px; /* 减小左右内边距，使指示器竖线紧贴右边缘 */
+    background: rgba(51, 51, 51, 0.7);
+    box-shadow: inset 0px 0px 12px 0px rgba(255, 255, 255, 0.03),
+                inset 0px 4px 4px 0px rgba(255, 255, 255, 0.02),
+                0px 5px 50px 0px rgba(0, 0, 0, 0.3),
+                0px 2px 6px 0px rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: stretch;
-    gap: 20px;
-    transform-origin: top;
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.quicktap-search-container {
-    width: 100%;
-    height: 48px;
-    padding: 4px 12px;
-    background: rgba(0, 0, 0, 0.30);
-    border-radius: 16px;
-    display: flex;
     align-items: center;
-    gap: 8px;
-    position: relative;
+    gap: 16px;
+    transform-origin: left;
+    color: rgba(255, 255, 255, 0.9);
+    overflow: visible; /* 改回为visible，因为指示器竖线需要超出容器 */
+    outline: 1px solid rgba(255, 255, 255, 0.05);
+    outline-offset: -1px;
+    position: relative; /* 添加相对定位，作为指示器竖线的定位参考 */
 }
 
-.quicktap-search[type="text"] {
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.90);
-    font-size: 14px;
-    font-weight: 400;
-    outline: none;
-    padding: 0;
-    margin: 0;
-    line-height: normal;
-    text-transform: none;
-    text-align: left;
-    box-shadow: none;
-    border-radius: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    --tw-ring-offset-shadow: none;
-    --tw-ring-shadow: none;
-    --tw-shadow: none;
-    box-shadow: none;
-    outline: none;
-}
-
-.quicktap-search::placeholder {
-    color: rgba(255, 255, 255, 0.30);
-}
+/* 搜索框相关样式已移除 */
 
 .quicktap-apps {
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: center;
     gap: 16px;
-    overflow-y: visible;
-    max-height: calc(80vh - 144px);
+    overflow-y: auto;
+    max-height: calc(80vh - 80px);
     scrollbar-width: none;
     -ms-overflow-style: none;
-    padding-right: 4px;
+    padding: 0 10px; /* 添加左右内边距，为图标放大提供空间 */
+    margin-top: 0;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -143,9 +112,12 @@
 
 .app-list {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 16px;
     min-width: 0;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
 }
 
 .app-icon {
@@ -153,10 +125,28 @@
     height: 40px;
     position: relative;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible; /* 改为visible，允许指示器竖线超出图标边界 */
     cursor: pointer;
     flex: 0 0 auto;
     transition: transform 0.2s ease, border-color 0.2s ease;
+    /* 移除容器的投影效果 */
+}
+
+/* 已打开应用的指示器竖线 */
+.app-icon .active-indicator {
+    position: absolute;
+    top: 0;
+    right: -10px; /* 调整距离，使其紧贴侧边栏右边缘 */
+    width: 2px;
+    height: 40px; /* 与图标高度一致 */
+    background-color: #356AE5; /* 使用主题色 */
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.app-icon.active .active-indicator {
+    opacity: 1;
 }
 
 .app-icon img {
@@ -164,12 +154,13 @@
     height: 100%;
     object-fit: cover;
     pointer-events: none;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.05));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .app-icon:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.20);
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+    z-index: 10;
 }
 
 .app-icon:hover img {
@@ -179,10 +170,11 @@
 .add-app-btn {
     width: 40px;
     height: 40px;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 0;
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    outline: 1px solid rgba(255, 255, 255, 0.1);
+    outline-offset: -1px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -190,12 +182,15 @@
     flex: 0 0 auto;
     transition: all 0.2s ease;
     order: 1;
+    position: relative;
+    overflow: hidden;
 }
 
 .add-app-btn:hover {
-    background: rgba(0, 0, 0, 0);
-    border-color: rgba(255, 255, 255, 0.20);
-    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 10;
 }
 
 .quicktap-extension .plus-icon {
@@ -209,45 +204,47 @@
 }
 
 .quicktap-extension .plus-icon .icon {
-    width: 14px;
-    height: 14px;
-    position: relative;
+    width: 24px;
+    height: 24px;
+    position: absolute;
+    left: 8px;
+    top: 8px;
     pointer-events: none;
+    overflow: hidden;
 }
 
 .quicktap-extension .plus-icon .icon::before,
 .quicktap-extension .plus-icon .icon::after {
     content: '';
     position: absolute;
-    background: rgba(255, 255, 255, 0.70);
-    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.7);
     pointer-events: none;
 }
 
 .quicktap-extension .plus-icon .icon::before {
     width: 14px;
     height: 2px;
-    top: 6px;
-    left: 0;
+    left: 5px;
+    top: 11px;
 }
 
 .quicktap-extension .plus-icon .icon::after {
     width: 2px;
     height: 14px;
-    left: 6px;
-    top: 0;
+    left: 11px;
+    top: 5px;
 }
 
 /* Context menu styles */
 .context-menu,
 .icon-context-menu,
 .edit-app-modal {
-    background: rgba(33, 33, 33, 0.9);
-    border-radius: 12px;
-    box-shadow: 0px 5px 50px rgba(0, 0, 0, 0.80);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px) ;
+    background: rgba(28, 28, 28, 0.95);
+    border-radius: 10px;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.60);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     z-index: 2147483647;
 }
 
@@ -272,9 +269,9 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    color: rgba(255, 255, 255, 0.70);
+    color: rgba(255, 255, 255, 0.75);
     font-size: 12px;
-    border-radius: 8px;
+    border-radius: 6px;
     transition: background 0.2s;
     white-space: nowrap;
     position: relative;
@@ -303,9 +300,9 @@
 /* Edit modal styles */
 .edit-app-modal {
     position: fixed;
-    width: 240px;
-    padding: 16px;
-    border-radius: 16px;
+    width: 220px;
+    padding: 12px;
+    border-radius: 10px;
     display: none;
     flex-direction: column;
     overflow: visible;
@@ -322,11 +319,11 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .edit-app-modal h3 {
-    color: rgba(255, 255, 255, 0.50);
+    color: rgba(255, 255, 255, 0.60);
     font-size: 12px;
     font-weight: 400;
     margin: 0;
@@ -339,10 +336,10 @@
 
 .edit-app-modal .save-btn,
 .edit-app-modal .cancel-btn {
-    padding: 4px 12px;
-    border-radius: 8px;
+    padding: 3px 10px;
+    border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.10);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -371,16 +368,16 @@
 .edit-app-modal .form {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     overflow: visible;
 }
 
 .edit-app-modal input {
     width: 100%;
-    height: 36px;
-    padding: 8px;
+    height: 32px;
+    padding: 6px 8px;
     background: rgba(0, 0, 0, 0.20);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.90);
     font-size: 12px;
@@ -405,9 +402,9 @@
 .edit-app-icon {
     position: relative;
     overflow: visible;
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -417,9 +414,9 @@
 }
 
 .edit-app-icon img {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     object-fit: cover;
     pointer-events: none;
 }
@@ -436,10 +433,10 @@
     width: 2px;
     height: 40px;
     background: rgba(53, 106, 229, 0.8);
-    border-radius: 2px;
+    border-radius: 1px;
     z-index: 2147483646;
     pointer-events: none;
-    box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
     transition: transform 0.1s ease;
     display: none;
 }
@@ -463,6 +460,7 @@
     justify-content: center;
     top: 50%;
     transform: translateY(-50%);
+    right: 12px;
 }
 
 .loading-spinner::after {
@@ -470,7 +468,7 @@
     width: 14px;
     height: 14px;
     border: 1.5px solid rgba(255, 255, 255, 0.1);
-    border-top-color: rgba(255, 255, 255, 0.7);
+    border-top-color: rgba(255, 255, 255, 0.8);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -488,15 +486,16 @@
 
 .error-message {
     position: fixed;
-    bottom: 20px;
+    bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
     background-color: #ff4444;
     color: white;
-    padding: 10px 20px;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    padding: 8px 16px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     z-index: 10000;
+    font-size: 12px;
     animation: fadeIn 0.3s ease-in-out;
 }
 
