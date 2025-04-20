@@ -335,7 +335,7 @@ QuickTap 插件全局样式说明
     height: 40px;
     padding: 0;
     border-radius: 12px;
-    outline: 1px solid rgba(255, 255, 255, 0.15);
+    outline: 1px solid rgba(255, 255, 255, 0.2);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -590,16 +590,20 @@ QuickTap 插件全局样式说明
 }
 
 /* Drag guide line styles */
-.drag-guide-line {
+.app-list {
     position: relative;
+}
+
+.drag-guide-line {
+    position: absolute;
+    left: 0;
     width: 100%;
-    height: 3px;
-    margin: 6px 0; /* 添加上下间距，使指示线更明显 */
-    background: rgba(53, 106, 229, 0.8);
-    border-radius: 2px;
+    height: 2px;
+    background: #ffffff91;
+    border-radius: 0;
     z-index: 10;
     pointer-events: none;
-    box-shadow: 0 0 6px rgba(53, 106, 229, 0.2);
+    box-shadow: none;
     transition: opacity 0.15s;
     display: none;
 }

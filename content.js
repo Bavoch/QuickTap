@@ -201,16 +201,10 @@ class QuickTap {
             </div>
         `;
 
-        // 创建拖拽指示线 - 使用CSS类而不是绝对定位
+        // 创建拖拽指示线，仅依赖 CSS 控制样式
         this.dragGuideLine = document.createElement('div');
         this.dragGuideLine.className = 'drag-guide-line quicktap-extension';
-        // 添加基本样式
-        this.dragGuideLine.style.width = '100%';
-        this.dragGuideLine.style.height = '4px';
-        this.dragGuideLine.style.backgroundColor = '#2196F3';
         this.dragGuideLine.style.display = 'none';
-        this.dragGuideLine.style.margin = '0';
-        this.dragGuideLine.style.padding = '0';
 
         // Create context menu
         this.contextMenu = document.createElement('div');
@@ -516,8 +510,13 @@ class QuickTap {
         this.loadApps();
 
         // 默认隐藏侧边栏，不再自动显示
+        const self = this;
         setTimeout(() => {
-            this.hide();
+            if (typeof self.hide === 'function') {
+                self.hide();
+            } else {
+                console.warn('hide 方法不存在');
+            }
         }, 500);
 
         // 定期更新图标活跃状态
@@ -608,7 +607,6 @@ class QuickTap {
             }
             e.preventDefault();
         });
-        
         return container;
     }
 
@@ -625,39 +623,73 @@ class QuickTap {
 
         // 拖拽到自己身上时不显示指示线
         if (draggedIndex === targetIndex) {
-            // 移除所有图标的指示线样式
             this.removeAllGuideLines();
+            if (this.dragGuideLine && this.dragGuideLine.parentNode) {
+                this.dragGuideLine.style.display = 'none';
+            }
             return;
         }
 
-        console.log(`[指示线] 显示指示线，从 ${draggedIndex} 到 ${targetIndex}`);
-
-        // 先移除所有图标的指示线样式
+        // 移除所有图标的 border
         this.removeAllGuideLines();
 
-        // 判断拖拽方向，决定指示线在目标图标的上方还是下方
+        // 计算插入位置
+        const appList = this.popup.querySelector('.app-list');
+        if (!appList) return;
+
+        // 显示 drag-guide-line
+        this.dragGuideLine.style.display = 'block';
+
+        // 计算指示线的 top 位置（绝对定位，不插入 DOM 顺序）
+        const rect = container.getBoundingClientRect();
+        const listRect = appList.getBoundingClientRect();
+        let top = 0;
+        let prevIcon = null;
         if (draggedIndex < targetIndex) {
-            // 向下拖拽，指示线在目标图标下方
-            container.style.borderBottom = '4px solid #2196F3';
-            container.classList.add('drop-target-bottom');
+            // 指示线应在目标图标的下方和下一个图标的中间（支持 add-app-btn）
+            prevIcon = container;
+            let nextIcon = container.nextElementSibling;
+            // 跳过非图标元素，但允许 add-app-btn
+            while (nextIcon && !nextIcon.classList.contains('app-icon') && !nextIcon.classList.contains('add-app-btn')) {
+                nextIcon = nextIcon.nextElementSibling;
+            }
+            const prevRect = prevIcon.getBoundingClientRect();
+            const nextRect = nextIcon ? nextIcon.getBoundingClientRect() : prevRect;
+            // 如果有下一个元素（图标或添加按钮），取两者中点，否则贴在最后一个元素下方
+            top = nextIcon
+                ? (prevRect.bottom + nextRect.top) / 2 - listRect.top
+                : prevRect.bottom - listRect.top;
         } else {
-            // 向上拖拽，指示线在目标图标上方
-            container.style.borderTop = '4px solid #2196F3';
-            container.classList.add('drop-target-top');
+            // 指示线应在目标图标的上方和前一个元素的中间（支持 add-app-btn）
+            let prevIcon = container.previousElementSibling;
+            while (prevIcon && !prevIcon.classList.contains('app-icon') && !prevIcon.classList.contains('add-app-btn')) {
+                prevIcon = prevIcon.previousElementSibling;
+            }
+            const prevRect = prevIcon ? prevIcon.getBoundingClientRect() : rect;
+            // 有前一个元素时取中点，否则贴在第一个元素上方
+            top = prevIcon
+                ? (prevRect.bottom + rect.top) / 2 - listRect.top
+                : rect.top - listRect.top;
         }
-        
-        // 存储目标索引，但不实际移动元素，等到松开鼠标后才移动
+        this.dragGuideLine.style.top = `${top}px`;
+        if (appList.lastChild !== this.dragGuideLine) {
+            appList.appendChild(this.dragGuideLine);
+        }
+
+        // 存储目标索引
         this.targetDropIndex = targetIndex;
     }
-    
+
     // 移除所有图标的指示线样式
     removeAllGuideLines() {
         const allIcons = this.popup.querySelectorAll('.app-icon');
         allIcons.forEach(icon => {
-            icon.style.borderTop = '';
-            icon.style.borderBottom = '';
             icon.classList.remove('drop-target-top', 'drop-target-bottom');
         });
+        // 隐藏指示线
+        if (this.dragGuideLine) {
+            this.dragGuideLine.style.display = 'none';
+        }
     }
 
     async loadApps() {
@@ -1744,6 +1776,11 @@ appList.appendChild(appIcon);
         } catch (error) {
             console.error('Error highlighting duplicate app:', error);
         }
+    }
+
+    // 暂时禁用自动隐藏
+    hide() {
+        console.log('hide 方法被调用，但已禁用自动隐藏');
     }
 
     // 添加 URL 自动补全函数
