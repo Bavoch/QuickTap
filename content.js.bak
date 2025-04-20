@@ -1309,37 +1309,34 @@ appList.appendChild(appIcon);
     }
 
     show() {
-        // 强制显示侧边栏
         this.popup.classList.add('visible');
         this.visible = true;
-        
-        // 添加临时样式确保侧边栏不会被隐藏
-        this.popup.style.opacity = '1';
-        this.popup.style.visibility = 'visible';
-        this.popup.style.left = '20px';
-        
+
         // 当侧边栏显示时，隐藏触发区域
         if (this.triggerZone) {
             this.triggerZone.classList.remove('visible');
-            this.triggerZone.classList.remove('idle');
+            this.triggerZone.classList.remove('idle'); // 显示侧边栏时移除闲置态
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
             }
         }
-        
+
         // 清除可能存在的隐藏定时器
         if (this.hideTimer) {
             clearTimeout(this.hideTimer);
-            this.hideTimer = null;
-        }
-        
-        console.log('侧边栏已强制显示（测试模式下不会自动隐藏）');
     }
+    */
+}
 
-    togglePopup() {
-        // 始终显示侧边栏，不再切换显示/隐藏状态
-        if (!this.visible) {
+togglePopup() {
+    // 始终显示侧边栏，不再切换显示/隐藏状态
+    if (!this.visible) {
+        this.show();
+    }
+}
+
+// clearSearchResults 方法已移除，因为我们已经移除了搜索框
             this.show();
         }
     }
@@ -1398,7 +1395,7 @@ appList.appendChild(appIcon);
                     resolve();
                 });
             });
-
+            
             // 拖拽后立即刷新UI和索引
             await this.loadApps();
             console.log('[拖拽排序] 拖拽后已强制刷新UI');

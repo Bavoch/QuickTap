@@ -1,6 +1,7 @@
 // Listen for extension icon clicks
 chrome.action.onClicked.addListener((tab) => {
-    chrome.tabs.sendMessage(tab.id, { action: 'toggle' });
+    // 不再发送toggle消息，避免自动显示侧边栏
+    // chrome.tabs.sendMessage(tab.id, { action: 'toggle' });
 });
 
 // 监听标签页变化
@@ -80,16 +81,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const urlObj = new URL(url);
                 const domain = urlObj.hostname;
 
+                console.log(`Trying to find tab for domain: ${domain}`);
+
                 // 先尝试找到完全匹配的URL
                 let matchingTab = tabs.find(tab => tab.url === url);
+                if (matchingTab) {
+                    console.log(`Found exact URL match: ${matchingTab.url}`);
+                }
 
                 // 如果没有完全匹配的，尝试找到域名匹配的
                 if (!matchingTab) {
                     matchingTab = tabs.find(tab => {
+                        if (!tab.url) return false;
+
                         try {
                             const tabUrlObj = new URL(tab.url);
-                            return tabUrlObj.hostname === domain;
+                            const isMatch = tabUrlObj.hostname === domain;
+                            if (isMatch) {
+                                console.log(`Found domain match: ${tab.url}`);
+                            }
+                            return isMatch;
                         } catch (e) {
+                            console.warn(`Error parsing tab URL: ${tab.url}`, e);
                             return false;
                         }
                     });
@@ -97,17 +110,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                 if (matchingTab) {
                     // 如果找到匹配的标签页，切换到该标签页
+                    console.log(`Switching to tab: ${matchingTab.id} (${matchingTab.url})`);
                     chrome.tabs.update(matchingTab.id, { active: true });
                     chrome.windows.update(matchingTab.windowId, { focused: true });
+                    // 发送响应表示成功
+                    sendResponse({ success: true, switched: true });
                 } else {
                     // 如果没有找到匹配的标签页，打开新标签页
+                    console.log(`No matching tab found, creating new tab for: ${url}`);
                     chrome.tabs.create({ url: url });
+                    // 发送响应表示成功
+                    sendResponse({ success: true, switched: false });
                 }
             } catch (e) {
                 // 如果出错，直接打开新标签页
+                console.error(`Error in switchOrOpenUrl:`, e);
                 chrome.tabs.create({ url: url });
+                // 发送响应表示出错
+                sendResponse({ success: false, error: e.message });
             }
         });
+        return true; // 保持消息通道开放，允许异步响应
     } else if (request.action === 'getOpenTabs') {
         // 获取所有打开的标签页
         try {
