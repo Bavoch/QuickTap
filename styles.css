@@ -1,10 +1,25 @@
-/* 为所有插件元素添加命名空间前缀 */
+/*
+========================================
+QuickTap 插件全局样式说明
+- 本文件所有样式均以 .quicktap- 前缀命名，避免污染页面原有样式。
+- 建议调整时先阅读每个区块顶部注释。
+========================================
+*/
+
+/* 为所有插件元素添加命名空间前缀
+   防止样式污染页面其它元素 */
 .quicktap-extension {
     all: initial;
 }
 
 
-/* 重置插件元素的样式 */
+/*
+----------------------------------------
+基础重置
+----------------------------------------
+- 统一插件内主要元素的 box-sizing、字体、边距等。
+- 保证跨浏览器一致性。
+*/
 .quicktap-popup,
 .quicktap-popup *,
 .context-menu,
@@ -20,7 +35,13 @@
     font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
-/* 添加一个遮罩层来阻止事件穿透 */
+/*
+----------------------------------------
+遮罩层（overlay）
+----------------------------------------
+- 用于弹窗激活时阻止页面事件穿透。
+- 可通过 visible 类控制其显示和事件响应。
+*/
 .quicktap-overlay {
     position: fixed;
     top: 0;
@@ -38,15 +59,23 @@
     visibility: visible;
 }
 
+/*
+----------------------------------------
+侧边栏主容器（popup）
+----------------------------------------
+- 控制侧边栏的定位、显示/隐藏动画。
+- left 属性决定侧边栏的初始/显示位置。
+- 可调节 left、top、min-width、min-height 以适配不同布局。
+*/
 .quicktap-popup {
     position: fixed;
     top: 50%;
-    left: 20px;
-    transform: translateY(-50%) scale(0.99);
+    left: -80px; /* 初始位置在屏幕外 */
+    transform: translateY(-50%);
     opacity: 0;
     visibility: hidden;
     z-index: 2147483645;
-    transition: opacity 0.15s ease, transform 0.3s cubic-bezier(.39,0,.26,1);
+    transition: opacity 0.3s ease, left 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
     min-width: auto;
     min-height: auto;
     line-height: normal;
@@ -54,26 +83,116 @@
     pointer-events: auto;
 }
 
+/*
+- 控制侧边栏弹出时的可见性和位置。
+- left 建议与 .quicktap-trigger-zone 的宽度错开，避免遮挡。
+- 暂时修改为始终可见，方便测试
+*/
+.quicktap-popup {
+    /* 暂时修改：始终可见，不需要 .visible 类 */
+    opacity: 1 !important;
+    visibility: visible !important;
+    left: 20px !important; /* 显示时的位置 */
+}
+
+/* 原始样式，测试完成后恢复
 .quicktap-popup.visible {
     opacity: 1;
     visibility: visible;
-    transform: translateY(-50%) scale(1);
+    left: 20px;
 }
+*/
 
 /* 侧边栏隐藏按钮已移除 */
 
+/*
+----------------------------------------
+侧边栏触发区域（屏幕左侧）
+----------------------------------------
+- 鼠标靠近屏幕左侧时显示，为侧边栏唤起提供“热区”。
+- width 决定可触发区域宽度，建议与 .quicktap-popup.visible 的 left 保持协调。
+- opacity/visibility 控制显示与隐藏。
+*/
+.quicktap-trigger-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 100vh;
+    background: transparent;
+    z-index: 2147483644;
+    pointer-events: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/*
+----------------------------------------
+隐藏时的视觉指示线
+----------------------------------------
+- 仅在侧边栏隐藏时出现，提示用户此处可唤出内容。
+- 可调整宽度、高度、颜色、圆角以适配设计。
+*/
+.quicktap-trigger-zone::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    width: 6px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    opacity: 1;
+    transform: translateY(-50%);
+    transition: background 0.2s, opacity 0.2s;
+    pointer-events: none;
+    box-shadow: none;
+}
+
+/*
+- 指示线在触发区可见时颜色加深，提升可见性。
+*/
+.quicktap-trigger-zone.visible::before {
+    opacity: 1;
+    background: rgba(123, 123, 123, 0.4);
+}
+
+/*
+- 指示线在闲置一段时间后变得更淡，减少干扰。
+- 可通过添加 idle 类实现。
+*/
+.quicktap-trigger-zone.idle::before {
+    opacity: 0.2;
+    transition: opacity 0.5s;
+}
+
+/*
+- 触发区域可见时，提升透明度与可交互性。
+*/
+.quicktap-trigger-zone.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/*
+----------------------------------------
+侧边栏内容容器
+----------------------------------------
+- 控制侧边栏整体宽度、背景、圆角、阴影。
+- 可通过 max-height、padding、backdrop-filter 等调整观感。
+*/
 .quicktap-container {
     width: 64px;
     height: auto;
-    min-height: 300px;
     max-height: 80vh;
-    padding: 20px 12px; /* 减小左右内边距，使指示器竖线紧贴右边缘 */
-    background: rgba(51, 51, 51, 0.7);
+    padding: 12px 12px;
+    background: rgba(18, 19, 20, 0.7);
     box-shadow: inset 0px 0px 12px 0px rgba(255, 255, 255, 0.03),
                 inset 0px 4px 4px 0px rgba(255, 255, 255, 0.02),
                 0px 5px 50px 0px rgba(0, 0, 0, 0.3),
                 0px 2px 6px 0px rgba(0, 0, 0, 0.2);
-    border-radius: 20px;
+    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -84,7 +203,7 @@
     gap: 16px;
     transform-origin: left;
     color: rgba(255, 255, 255, 0.9);
-    overflow: visible; /* 改回为visible，因为指示器竖线需要超出容器 */
+    overflow: visible; /* 保持为visible，因为指示器小圆点需要超出容器 */
     outline: 1px solid rgba(255, 255, 255, 0.05);
     outline-offset: -1px;
     position: relative; /* 添加相对定位，作为指示器竖线的定位参考 */
@@ -92,17 +211,26 @@
 
 /* 搜索框相关样式已移除 */
 
+/*
+----------------------------------------
+应用列表区域
+----------------------------------------
+- 控制应用列表的排列、滚动条、间距。
+- max-height/padding 可根据需求自定义。
+*/
 .quicktap-apps {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    overflow-y: auto;
+    /* overflow-y: auto; 移除溢出裁切，防止图标被遮挡 */
     max-height: calc(80vh - 80px);
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding: 0 10px; /* 添加左右内边距，为图标放大提供空间 */
     margin-top: 0;
+    min-height: 40px; /* 确保在没有内容时也有最小高度 */
+    overflow: visible;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -110,16 +238,31 @@
     display: none;
 }
 
+/*
+----------------------------------------
+应用图标列表
+----------------------------------------
+- 纵向排列所有 app-icon。
+- gap 控制图标间距。
+*/
 .app-list {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    overflow: visible;
     min-width: 0;
     justify-content: flex-start;
     align-items: center;
     width: 100%;
 }
 
+/*
+----------------------------------------
+单个应用图标容器
+----------------------------------------
+- 控制图标尺寸、圆角、拖拽时的视觉反馈。
+- overflow: visible 允许小圆点等装饰超出边界。
+*/
 .app-icon {
     width: 40px;
     height: 40px;
@@ -132,21 +275,42 @@
     /* 移除容器的投影效果 */
 }
 
-/* 已打开应用的指示器竖线 */
-.app-icon .active-indicator {
-    position: absolute;
-    top: 0;
-    right: -10px; /* 调整距离，使其紧贴侧边栏右边缘 */
-    width: 2px;
-    height: 40px; /* 与图标高度一致 */
-    background-color: #356AE5; /* 使用主题色 */
-    z-index: 2;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+/* 已打开应用的指示器小圆点 */
+/*
+----------------------------------------
+已打开应用的小圆点指示器
+----------------------------------------
+- 通过 absolute 定位于 app-icon 右上角。
+- 可调整大小、颜色、阴影。
+*/
+.app-icon {
+    position: relative;
+    /* 保证小白点定位参照整个图标容器 */
 }
 
+.app-icon .active-indicator {
+    position: absolute;
+    left: -14px; /* 图标左侧外边距，适当调整 */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px;
+    height: 5px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 3px 1px rgba(0,0,0,0.10);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s;
+    z-index: 2;
+}
+
+
 .app-icon.active .active-indicator {
-    opacity: 1;
+    background: #ffffff76;
+}
+
+.app-icon {
+    position: relative;
 }
 
 .app-icon img {
@@ -154,8 +318,7 @@
     height: 100%;
     object-fit: contain; /* 改为 contain 以保持图标原始宽高比 */
     pointer-events: none;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25)); /* 增强投影效果 */
-    border-radius: 8px; /* 添加圆角，使异形图标的投影更自然 */
+    border-radius: 12px; /* 添加圆角，使异形图标的投影更自然 */
     transition: filter 0.2s ease, transform 0.2s ease;
 }
 
@@ -164,17 +327,15 @@
 }
 
 .app-icon:hover img {
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35)); /* 增强投影效果 */
+    transform: scale(1.1); /* 改为放大效果 */
 }
 
 .add-app-btn {
     width: 40px;
     height: 40px;
     padding: 0;
-    background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
-    outline: 1px solid rgba(255, 255, 255, 0.1);
-    outline-offset: -1px;
+    outline: 1px solid rgba(255, 255, 255, 0.15);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -430,15 +591,16 @@
 
 /* Drag guide line styles */
 .drag-guide-line {
-    position: absolute;
-    width: 2px;
-    height: 40px;
+    position: relative;
+    width: 100%;
+    height: 3px;
+    margin: 6px 0; /* 添加上下间距，使指示线更明显 */
     background: rgba(53, 106, 229, 0.8);
-    border-radius: 1px;
-    z-index: 2147483646;
+    border-radius: 2px;
+    z-index: 10;
     pointer-events: none;
-    box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
-    transition: transform 0.1s ease;
+    box-shadow: 0 0 6px rgba(53, 106, 229, 0.2);
+    transition: opacity 0.15s;
     display: none;
 }
 
@@ -446,6 +608,26 @@
 .app-icon.drag-over {
     position: relative;
     z-index: 1;
+}
+
+/* 已添加应用的高亮效果 */
+.app-icon.duplicate-highlight {
+    animation: duplicate-pulse 0.8s ease-in-out 3;
+}
+
+@keyframes duplicate-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(53, 106, 229, 0.4);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 10px rgba(53, 106, 229, 0.2);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(53, 106, 229, 0);
+    }
 }
 
 .loading-spinner {
