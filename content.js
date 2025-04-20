@@ -40,6 +40,10 @@ class QuickTap {
         // 初始化
         this.init();
 
+        // 指示线闲置定时器
+        this.triggerIdleTimer = null;
+        this.IDLE_DELAY = 2000; // 闲置判定时长（毫秒）
+
         // Listen for changes in chrome.storage
         this.isLoadingApps = false; // 添加标志防止重复加载
         this.loadingTimeout = null; // 用于防止短时间内多次加载
@@ -133,34 +137,25 @@ class QuickTap {
         this.triggerZone = document.createElement('div');
         this.triggerZone.className = 'quicktap-trigger-zone quicktap-extension';
         // 初始时隐藏触发区域，因为侧边栏默认会显示
-        this.triggerZone.classList.remove('visible');
+        this.triggerZone.classList.remove('active');
         document.body.appendChild(this.triggerZone);
+        this.visible = true; // 初始为可见
 
-        // 指示线闲置定时器
-        this.triggerIdleTimer = null;
-        this.IDLE_DELAY = 2000; // 闲置判定时长（毫秒）
+        // 确保触发区域初始状态正确
+        this.triggerZone.classList.remove('active');
+        this.triggerZone.classList.remove('visible');
+        this.triggerZone.classList.remove('idle');
 
         // 添加触发区域的鼠标进入事件
         this.triggerZone.addEventListener('mouseenter', () => {
-            // 当鼠标进入触发区域时，显示侧边栏
+            // 鼠标进入触发区时，唤醒侧边栏
             if (!this.visible) {
                 this.show();
             }
-            // 鼠标靠近时移除 idle
-            this.triggerZone.classList.remove('idle');
-            if (this.triggerIdleTimer) {
-                clearTimeout(this.triggerIdleTimer);
-                this.triggerIdleTimer = null;
-            }
         });
-        // 鼠标离开触发区，启动闲置倒计时
         this.triggerZone.addEventListener('mouseleave', () => {
-            if (this.triggerIdleTimer) {
-                clearTimeout(this.triggerIdleTimer);
-            }
-            this.triggerIdleTimer = setTimeout(() => {
-                this.triggerZone.classList.add('idle');
-            }, this.IDLE_DELAY);
+            // 鼠标离开触发区，不做特殊处理
+            // 指示线的显示状态完全由hide和show方法控制
         });
 
         // Load shortcut settings
@@ -191,7 +186,7 @@ class QuickTap {
 
         // Create popup container
         this.popup = document.createElement('div');
-        this.popup.className = 'quicktap-popup quicktap-extension';
+        this.popup.className = 'quicktap-popup quicktap-extension visible';
         this.popup.innerHTML = `
             <div class="quicktap-container">
                 <div class="quicktap-apps">
@@ -337,21 +332,17 @@ class QuickTap {
         });
 
         this.popup.addEventListener('mouseleave', () => {
-            // 暂时注释掉自动隐藏侧边栏的功能，方便测试
-            /* 
-            // 当鼠标离开侧边栏时，如果编辑模态框或右键菜单未打开，则隐藏
+            // 鼠标离开侧边栏时，立即隐藏
             const isEditVisible = this.editModal && this.editModal.style.display !== 'none';
             const isContextMenuVisible = this.contextMenu && this.contextMenu.style.display === 'block';
             if (this.visible && !isEditVisible && !isContextMenuVisible) {
+                // 立即隐藏，不再使用定时器
                 this.hide();
-                // 清除可能存在的定时器
                 if (this.hideTimer) {
                     clearTimeout(this.hideTimer);
                     this.hideTimer = null;
                 }
             }
-            */
-            console.log('鼠标离开侧边栏，但自动隐藏功能已暂时禁用');
         });
 
         // 快捷键不再切换侧边栏显示状态
@@ -1344,12 +1335,12 @@ appList.appendChild(appIcon);
         // 强制显示侧边栏
         this.popup.classList.add('visible');
         this.visible = true;
-        
+
         // 添加临时样式确保侧边栏不会被隐藏
         this.popup.style.opacity = '1';
         this.popup.style.visibility = 'visible';
         this.popup.style.left = '20px';
-        
+
         // 当侧边栏显示时，隐藏触发区域
         if (this.triggerZone) {
             this.triggerZone.classList.remove('visible');
@@ -1359,13 +1350,13 @@ appList.appendChild(appIcon);
                 this.triggerIdleTimer = null;
             }
         }
-        
+
         // 清除可能存在的隐藏定时器
         if (this.hideTimer) {
             clearTimeout(this.hideTimer);
             this.hideTimer = null;
         }
-        
+
         console.log('侧边栏已强制显示（测试模式下不会自动隐藏）');
     }
 
@@ -1382,42 +1373,42 @@ appList.appendChild(appIcon);
         try {
             e.preventDefault();
             container.classList.remove('drag-over');
-            
+
             // 移除所有图标的指示线样式
             this.removeAllGuideLines();
             console.log('[拖拽排序] 移除所有指示线样式');
-            
+
             if (!e.dataTransfer) return;
-            
+
             // 获取拖拽的源索引
             const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-            
+
             // 使用 targetDropIndex 作为目标索引，如果没有则使用容器的索引
             const toIndex = this.targetDropIndex !== undefined ? this.targetDropIndex : parseInt(container.dataset.index);
             console.log(`[拖拽排序] 目标索引: ${toIndex}, 源索引: ${fromIndex}`);
-            
+
             // 重置目标索引
             this.targetDropIndex = undefined;
-            
+
             if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) {
                 console.log('[拖拽排序] 索引无效或相同，不执行排序');
                 return;
             }
-            
+
             const apps = await this.getApps();
             if (!Array.isArray(apps) || fromIndex < 0 || fromIndex >= apps.length || toIndex < 0 || toIndex >= apps.length) {
                 console.log(`[拖拽排序] 索引越界: fromIndex=${fromIndex}, toIndex=${toIndex}, apps.length=${apps ? apps.length : 'undefined'}`);
                 return;
             }
-            
+
             // 重新排序 - 只在松开鼠标后才执行
             const [movedApp] = apps.splice(fromIndex, 1);
             const insertIndex = fromIndex < toIndex ? toIndex : toIndex;
             apps.splice(insertIndex, 0, movedApp);
-            
+
             console.log(`[拖拽排序] from ${fromIndex} → ${toIndex}，插入索引: ${insertIndex}`);
             console.log('[拖拽排序] 新顺序:', apps.map(a => a.title));
-            
+
             // 保存新排序到存储
             await new Promise((resolve, reject) => {
                 chrome.storage.local.set({ apps }, () => {
@@ -1659,13 +1650,13 @@ appList.appendChild(appIcon);
                         // 使用完整URL进行比较，包括协议、域名、路径和查询参数
                         const appUrl = new URL(app.url);
                         const currentUrl = new URL(url);
-                        
+
                         // 完整URL比较，包括协议、域名、路径和查询参数
                         const appFullUrl = `${appUrl.origin}${appUrl.pathname}`;
                         const currentFullUrl = `${currentUrl.origin}${currentUrl.pathname}`;
-                        
+
                         console.log(`比较URL: ${appFullUrl} 与 ${currentFullUrl}`);
-                        
+
                         const isMatch = appFullUrl === currentFullUrl;
                         if (isMatch) {
                             console.log('找到重复应用，完整URL匹配');
@@ -1778,9 +1769,37 @@ appList.appendChild(appIcon);
         }
     }
 
-    // 暂时禁用自动隐藏
+    // 侧边栏自动隐藏实现
+    show() {
+        if (this.popup) {
+            this.popup.classList.add('visible');
+            this.visible = true;
+        }
+        if (this.triggerZone) {
+            this.triggerZone.classList.remove('active');
+            this.triggerZone.classList.remove('visible');
+        }
+    }
+
     hide() {
-        console.log('hide 方法被调用，但已禁用自动隐藏');
+        if (this.popup) {
+            this.popup.classList.remove('visible');
+            this.visible = false;
+        }
+        if (this.triggerZone) {
+            this.triggerZone.classList.add('active');
+            this.triggerZone.classList.add('visible');
+
+            // 设置闲置定时器，2秒后添加idle类
+            if (this.triggerIdleTimer) {
+                clearTimeout(this.triggerIdleTimer);
+            }
+            this.triggerIdleTimer = setTimeout(() => {
+                if (!this.visible) {
+                    this.triggerZone.classList.add('idle');
+                }
+            }, this.IDLE_DELAY);
+        }
     }
 
     // 添加 URL 自动补全函数

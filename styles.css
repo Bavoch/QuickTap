@@ -1,24 +1,13 @@
 /*
 ========================================
-QuickTap 插件全局样式说明
-- 本文件所有样式均以 .quicktap- 前缀命名，避免污染页面原有样式。
-- 建议调整时先阅读每个区块顶部注释。
+QuickTap 插件核心样式
 ========================================
 */
-
-/* 为所有插件元素添加命名空间前缀
-   防止样式污染页面其它元素 */
-.quicktap-extension {
-    all: initial;
-}
-
 
 /*
 ----------------------------------------
 基础重置
 ----------------------------------------
-- 统一插件内主要元素的 box-sizing、字体、边距等。
-- 保证跨浏览器一致性。
 */
 .quicktap-popup,
 .quicktap-popup *,
@@ -39,21 +28,18 @@ QuickTap 插件全局样式说明
 ----------------------------------------
 遮罩层（overlay）
 ----------------------------------------
-- 用于弹窗激活时阻止页面事件穿透。
-- 可通过 visible 类控制其显示和事件响应。
 */
 .quicktap-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     background: transparent;
     z-index: 2147483644;
     pointer-events: none;
     visibility: hidden;
 }
-
 .quicktap-overlay.visible {
     pointer-events: auto;
     visibility: visible;
@@ -63,69 +49,63 @@ QuickTap 插件全局样式说明
 ----------------------------------------
 侧边栏主容器（popup）
 ----------------------------------------
-- 控制侧边栏的定位、显示/隐藏动画。
-- left 属性决定侧边栏的初始/显示位置。
-- 可调节 left、top、min-width、min-height 以适配不同布局。
 */
 .quicktap-popup {
     position: fixed;
     top: 50%;
-    left: -80px; /* 初始位置在屏幕外 */
+    left: -80px;
     transform: translateY(-50%);
     opacity: 0;
     visibility: hidden;
     z-index: 2147483645;
-    transition: opacity 0.3s ease, left 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
-    min-width: auto;
-    min-height: auto;
-    line-height: normal;
-    text-align: left;
-    pointer-events: auto;
+    transition: opacity 0.3s, left 0.3s, visibility 0.3s;
+    pointer-events: none;
 }
-
-/*
-- 控制侧边栏弹出时的可见性和位置。
-- left 建议与 .quicktap-trigger-zone 的宽度错开，避免遮挡。
-- 暂时修改为始终可见，方便测试
-*/
-.quicktap-popup {
-    /* 暂时修改：始终可见，不需要 .visible 类 */
-    opacity: 1 !important;
-    visibility: visible !important;
-    left: 20px !important; /* 显示时的位置 */
-}
-
-/* 原始样式，测试完成后恢复
 .quicktap-popup.visible {
+    left: 16px;
     opacity: 1;
     visibility: visible;
-    left: 20px;
+    pointer-events: auto;
 }
-*/
-
-/* 侧边栏隐藏按钮已移除 */
 
 /*
 ----------------------------------------
 侧边栏触发区域（屏幕左侧）
 ----------------------------------------
-- 鼠标靠近屏幕左侧时显示，为侧边栏唤起提供“热区”。
-- width 决定可触发区域宽度，建议与 .quicktap-popup.visible 的 left 保持协调。
-- opacity/visibility 控制显示与隐藏。
 */
 .quicktap-trigger-zone {
     position: fixed;
     top: 0;
     left: 0;
-    width: 20px;
-    height: 100vh;
-    background: transparent;
+    width: 20px !important;
+    height: 100vh !important;
+    background: transparent !important;
     z-index: 2147483644;
     pointer-events: auto;
     opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    visibility: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    transition: opacity 0.3s ease;
 }
+
+.quicktap-trigger-zone.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.quicktap-trigger-zone.active::before {
+    opacity: 1;
+}
+.quicktap-trigger-zone:hover {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.quicktap-trigger-zone:hover::before {
+    opacity: 1;
+}
+
 
 /*
 ----------------------------------------
@@ -137,17 +117,33 @@ QuickTap 插件全局样式说明
 .quicktap-trigger-zone::before {
     content: '';
     position: absolute;
-    left: 12px;
+    left: 7px;
     top: 50%;
     width: 6px;
     height: 50px;
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.6);
     border-radius: 999px;
-    opacity: 1;
+    opacity: 0;
     transform: translateY(-50%);
     transition: background 0.2s, opacity 0.2s;
     pointer-events: none;
-    box-shadow: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 只在侧边栏隐藏时显示指示线 */
+.quicktap-popup.visible ~ .quicktap-trigger-zone::before,
+.quicktap-popup.visible + .quicktap-trigger-zone::before,
+body:has(.quicktap-popup.visible) .quicktap-trigger-zone::before {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.quicktap-popup.visible ~ .quicktap-trigger-zone,
+.quicktap-popup.visible + .quicktap-trigger-zone,
+body:has(.quicktap-popup.visible) .quicktap-trigger-zone {
+    /* 侧边栏显示时隐藏整个触发区（保险起见） */
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /*
@@ -155,7 +151,7 @@ QuickTap 插件全局样式说明
 */
 .quicktap-trigger-zone.visible::before {
     opacity: 1;
-    background: rgba(123, 123, 123, 0.4);
+    background: rgba(255, 255, 255, 0.4);
 }
 
 /*
@@ -171,7 +167,7 @@ QuickTap 插件全局样式说明
 - 触发区域可见时，提升透明度与可交互性。
 */
 .quicktap-trigger-zone.visible {
-    opacity: 1;
+    opacity: 1 !important;
     visibility: visible;
 }
 
@@ -592,6 +588,27 @@ QuickTap 插件全局样式说明
 /* Drag guide line styles */
 .app-list {
     position: relative;
+}
+
+.quicktap-trigger-zone {
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 80px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 16px;
+    z-index: 10000;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s, box-shadow 0.2s;
+    display: block;
+}
+.quicktap-trigger-zone.visible,
+.quicktap-trigger-zone:hover {
+    background: rgba(255,255,255,0.7);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 }
 
 .drag-guide-line {
