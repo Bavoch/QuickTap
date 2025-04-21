@@ -373,6 +373,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         })();
         return true; // 保持消息通道开放
+    } else if (request.action === 'updateApps') {
+        try {
+            if (!request.apps) {
+                console.warn('No apps provided for updateApps action');
+                return;
+            }
+
+            chrome.storage.local.set({ apps: request.apps }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('Error saving apps:', chrome.runtime.lastError);
+                }
+            });
+        } catch (error) {
+            console.error('Error in updateApps:', error);
+        }
     }
     } catch (error) {
         console.error('Error handling message:', error);

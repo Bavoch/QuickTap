@@ -48,15 +48,20 @@ class QuickTap {
         this.lastShowTime = 0; // 上次显示侧边栏的时间戳
 
         // Listen for changes in chrome.storage
-        this.isLoadingApps = false; // 添加标志防止重复加载
-        this.loadingTimeout = null; // 用于防止短时间内多次加载
+       this.isLoadingApps = false; // 添加标志防止重复加载
+       this.loadingTimeout = null; // 用于防止短时间内多次加载
+       this.isDragging = false; // 添加标志防止拖拽时重新加载
 
         this.storageChangeHandler = (changes, namespace) => {
             try {
                 if (namespace === 'local' && changes && changes.apps) {
-                    console.log('Storage changed, scheduling app reload...');
+                   if (this.isDragging) {
+                       console.log('Storage changed during drag, skipping app reload');
+                       return;
+                   }
+                   console.log('Storage changed, scheduling app reload...');
 
-                    // 清除之前的定时器
+                   // 清除之前的定时器
                     if (this.loadingTimeout) {
                         clearTimeout(this.loadingTimeout);
                     }
@@ -427,10 +432,12 @@ class QuickTap {
             const isContextMenuVisible = this.contextMenu && this.contextMenu.style.display === 'block';
 
             if (this.visible && !isEditVisible && !isContextMenuVisible) {
-                // 立即隐藏，不再使用定时器
-                console.log('[QuickTap Debug] Conditions met, calling hide() from popup mouseleave');
-                this.hide();
-                // Redundant timer clear, hide() handles this now
+               // 延迟隐藏，给拖拽操作完成留出时间
+               setTimeout(() => {
+                   console.log('[QuickTap Debug] Conditions met, calling hide() from popup mouseleave');
+                   this.hide();
+               }, 200); // 200ms 延迟
+               // Redundant timer clear, hide() handles this now
                 // if (this.hideTimer) {
                 //     clearTimeout(this.hideTimer);
                 //     this.hideTimer = null;
@@ -641,7 +648,7 @@ class QuickTap {
         container.title = app.title;
         container.dataset.index = index;
         container.dataset.url = app.url;
-        // 拖拽功能已移除，不再需要draggable属性
+        container.draggable = true; // 启用拖拽
 
         const img = document.createElement('img');
         img.alt = app.title;
@@ -678,7 +685,21 @@ class QuickTap {
         return container;
     }
 
-    // 拖拽排序相关方法已移除
+    // 获取拖拽目标位置的辅助方法
+    getDragAfterElement(container, y) {
+        const draggableElements = [...this.popup.querySelectorAll('.app-icon:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
 
     async loadApps() {
         try {
@@ -809,16 +830,167 @@ class QuickTap {
 
                 // 创建应用图标
                 const appIcon = this.createAppIcon(app, i);
-// 强制刷新data-index，防止拖拽后索引错乱
-appIcon.dataset.index = i;
+                // 强制刷新data-index，防止拖拽后索引错乱
+                appIcon.dataset.index = i;
 
-// 检查该应用是否已打开
-if (this.isAppOpen(app.url, openTabs)) {
-    appIcon.classList.add('active');
-}
+                // 检查该应用是否已打开
+                if (this.isAppOpen(app.url, openTabs)) {
+                    appIcon.classList.add('active');
+                }
 
-// 添加到应用列表
-appList.appendChild(appIcon);
+                // 添加拖拽事件监听器
+                appIcon.addEventListener('dragstart', (e) => {
+                    this.isDragging = true;
+                    // e.stopPropagation(); // Might prevent some default browser drag behaviors if needed
+                    // Use element's index at drag start
+                    e.dataTransfer.setData('text/plain', appIcon.dataset.index);
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Add delay to allow setting drag image properly
+                    setTimeout(() => {
+                        appIcon.classList.add('dragging');
+                    }, 0);
+                    // 设置拖拽图像
+                    const dragImage = document.createElement('img');
+                    dragImage.src = appIcon.querySelector('img').src;
+                    dragImage.style.width = '32px';
+                    dragImage.style.height = '32px';
+                    dragImage.style.opacity = '0.7';
+                    dragImage.style.position = 'absolute'; // Avoid affecting layout
+                    dragImage.style.left = '-9999px'; // Hide it initially
+                    document.body.appendChild(dragImage);
+                    e.dataTransfer.setDragImage(dragImage, 16, 16); // Center image on cursor
+                    // Clean up drag image after setting it
+                    setTimeout(() => document.body.removeChild(dragImage), 0);
+                });
+
+                // {{edit 2: Modify dragend listener}}
+                appIcon.addEventListener('dragend', (e) => {
+                    // Use querySelector to ensure we remove class from the correct element if it exists
+                    const draggingElem = this.popup?.querySelector('.app-icon.dragging');
+                    if (draggingElem) {
+                        draggingElem.classList.remove('dragging');
+                    }
+                    // Reset isDragging flag when drag operation concludes
+                    this.isDragging = false;
+                    // console.log('Drag ended, isDragging set to false');
+                    // Clear dataTransfer data (optional, good practice)
+                    // e.dataTransfer.clearData(); // This might cause issues on some browsers, test carefully
+                });
+
+                appIcon.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // Necessary to allow drop
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'move'; // Indicate moving is allowed
+
+                    const draggingElement = this.popup?.querySelector('.dragging');
+                    // Ensure we have a dragging element and it's not the element we are hovering over
+                    if (!draggingElement || draggingElement === appIcon) return;
+
+                    const appListContainer = this.domElements.appList;
+                    if(!appListContainer) return;
+
+                    const afterElement = this.getDragAfterElement(appListContainer, e.clientY);
+
+                    // Perform insert/append only if the position changes
+                    if (afterElement) {
+                        // Insert before afterElement only if draggingElement isn't already before it
+                        if(draggingElement.nextSibling !== afterElement){
+                            appListContainer.insertBefore(draggingElement, afterElement);
+                        }
+                    } else {
+                        // Append to end only if draggingElement isn't already the last child
+                        if(appListContainer.lastElementChild !== draggingElement){
+                             appListContainer.appendChild(draggingElement);
+                        }
+                    }
+                });
+
+                // {{edit 1: Replace drop listener logic}}
+                appIcon.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const draggedElement = this.popup?.querySelector('.dragging');
+                    // Ensure drop happens on a valid target and we were dragging something
+                    if (!draggedElement || !appIcon.classList.contains('app-icon')) {
+                        console.warn('Drop happened on invalid target or no element was being dragged.');
+                        // Ensure drag state is reset anyway (handled by dragend)
+                        return;
+                    }
+
+                    // console.log('Drop event triggered');
+
+                    try {
+                        // 1. Get the new order based on the current DOM structure
+                        const finalAppIcons = Array.from(this.domElements.appList.querySelectorAll('.app-icon'));
+                        const originalApps = await this.getApps(); // Get original data array
+
+                         // Check if elements exist before proceeding
+                         if (!finalAppIcons.length || !originalApps.length) {
+                            console.error('Could not get final icons or original apps data during drop.');
+                            return;
+                         }
+
+                        // Create a map of URL -> app data for efficient lookup
+                        const appDataMap = new Map();
+                        originalApps.forEach(app => {
+                            if (app && app.url) {
+                                appDataMap.set(app.url, app);
+                            } else {
+                                console.warn('Found app with missing URL in originalApps during drop mapping');
+                            }
+                        });
+
+                        const newAppsOrder = [];
+                        let dataConsistent = true;
+
+                        // 2. Rebuild the apps array and update data-index attributes immediately
+                        finalAppIcons.forEach((icon, index) => {
+                            const url = icon.dataset.url;
+                            if (appDataMap.has(url)) {
+                                newAppsOrder.push(appDataMap.get(url));
+                                // Update data-index immediately to match new DOM order
+                                icon.dataset.index = index.toString();
+                            } else {
+                                console.error(`Data inconsistency: Could not find app data for URL: ${url} at DOM index ${index} during reorder.`);
+                                dataConsistent = false;
+                                // Potentially push a placeholder or skip? Skipping loses data.
+                                // For now, log error and mark as inconsistent.
+                            }
+                        });
+
+                        // 3. Check for consistency before saving
+                        if (!dataConsistent || newAppsOrder.length !== originalApps.length) {
+                            console.error("App order inconsistency detected! Aborting save. Triggering recovery reload.",
+                                          "Original Count:", originalApps.length, "New Count:", newAppsOrder.length);
+                            // Optional: Trigger a full reload to try and recover state
+                            // Be cautious with this to avoid loops if the error persists.
+                            // await this.loadApps(); // Consider if safe
+                            return; // Prevent saving inconsistent data
+                        }
+
+                        // 4. Save the new order to storage via background script
+                        chrome.runtime.sendMessage({ action: 'updateApps', apps: newAppsOrder }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.error('Error sending updateApps message after drop:', chrome.runtime.lastError.message || chrome.runtime.lastError);
+                                // Data index was updated optimistically. If save fails,
+                                // the next storage change or manual refresh should correct it.
+                            } else {
+                                // console.log('App order update sent successfully.');
+                                // DOM indices already updated optimistically above.
+                            }
+                            // Drag state (isDragging, .dragging class) is reset in the 'dragend' listener
+                        });
+
+                    } catch (error) {
+                        console.error('Error processing drop event:', error);
+                        // Attempt to restore consistency? Or rely on dragend cleanup.
+                    }
+                    // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
+                });
+
+                // 添加到应用列表
+                appList.appendChild(appIcon);
             }
 
             console.log('Creating add button...');

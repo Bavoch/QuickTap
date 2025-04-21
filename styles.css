@@ -160,7 +160,21 @@
     transform: scale(1.1);
 }
 
-/* 拖拽相关样式已移除 */
+/* 拖拽相关样式 */
+.app-icon.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    z-index: 100;
+}
+
+.app-icon.dragging img {
+    transform: scale(1.1);
+    filter: brightness(0.8);
+}
+
+.app-icon {
+    cursor: grab;
+}
 
 .app-icon.duplicate-highlight {
     animation: duplicate-pulse 0.8s ease-in-out 3;
