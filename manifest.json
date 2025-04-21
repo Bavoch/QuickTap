@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "QuickTap",
   "version": "1.0",
-  "description": "快速搜索、翻译和访问您喜爱的网站",
+  "description": "浏览器的 Dock 栏",
   "permissions": [
     "activeTab",
     "storage",

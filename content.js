@@ -18,9 +18,7 @@ class QuickTap {
         this.editModal = null;
         this.currentAppIndex = null;
         this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false, command: false };
-        this.isDragging = false;
         this.loadingSpinner = null;
-        this.dragGuideLine = null;
         this.isInitialized = false; // 添加初始化标志
         this.hideTimer = null; // 用于定时隐藏侧边栏
         this.triggerZone = null; // 屏幕边缘触发区域
@@ -43,6 +41,11 @@ class QuickTap {
         // 指示线闲置定时器
         this.triggerIdleTimer = null;
         this.IDLE_DELAY = 2000; // 闲置判定时长（毫秒）
+
+        // 防抖动相关变量
+        this.showSidebarTimer = null;
+        this.showSidebarDelay = 300; // 显示侧边栏的延迟时间（毫秒）
+        this.lastShowTime = 0; // 上次显示侧边栏的时间戳
 
         // Listen for changes in chrome.storage
         this.isLoadingApps = false; // 添加标志防止重复加载
@@ -133,49 +136,134 @@ class QuickTap {
         this.overlay.className = 'quicktap-overlay quicktap-extension';
         document.body.appendChild(this.overlay);
 
-        // 创建屏幕边缘触发区域
+        // 创建屏幕边缘触发区域（半透明白色指示条）
         this.triggerZone = document.createElement('div');
         this.triggerZone.className = 'quicktap-trigger-zone quicktap-extension';
-        // 初始时隐藏触发区域，因为侧边栏默认会显示
-        this.triggerZone.classList.remove('active');
+        // 初始时显示触发区域，因为侧边栏默认不显示
+        this.triggerZone.style.display = 'block';
+        // 初始时将触发区域设置为闲置状态
+        this.triggerZone.classList.add('idle');
         document.body.appendChild(this.triggerZone);
-        this.visible = true; // 初始为可见
+        this.visible = false; // 初始为不可见
 
         // 确保触发区域初始状态正确
-        this.triggerZone.classList.remove('active');
-        this.triggerZone.classList.remove('visible');
-        this.triggerZone.classList.remove('idle');
+        // 保持idle类，使指示条处于闲置状态
 
-        // 添加触发区域的鼠标进入事件
+        // 添加防抖动变量
+        this.showSidebarTimer = null;
+        this.showSidebarDelay = 300; // 300ms延迟，防止抖动
+        this.lastShowTime = 0; // 记录上次显示时间
+
+        // 添加触发区域的鼠标进入事件（立即触发，无延迟）
         this.triggerZone.addEventListener('mouseenter', () => {
-            // 鼠标进入触发区时，唤醒侧边栏
+            console.log('[QuickTap Debug] Mouse entered triggerZone'); // Add log
+            // 清除可能存在的闲置定时器
+            if (this.triggerIdleTimer) {
+                clearTimeout(this.triggerIdleTimer);
+                this.triggerIdleTimer = null;
+                console.log('[QuickTap Debug] Cleared triggerIdleTimer on triggerZone mouseenter');
+            }
+            // 移除idle状态，确保指示条完全可见
+            if (this.triggerZone) {
+                // 强制移除idle类，确保指示线完全可见
+                this.triggerZone.classList.remove('idle');
+                console.log('[QuickTap Debug] Removed idle class from triggerZone on mouseenter. Classes:', this.triggerZone.classList.toString());
+            }
+
+            // 防抖动：检查距离上次显示的时间
+            const now = Date.now();
+            if (now - this.lastShowTime < 1000) { // 如果1秒内刚显示过，则不再触发
+                console.log('[QuickTap Debug] Ignoring rapid re-entry, last show was', now - this.lastShowTime, 'ms ago');
+                return;
+            }
+
+            // 清除可能存在的显示定时器
+            if (this.showSidebarTimer) {
+                clearTimeout(this.showSidebarTimer);
+                this.showSidebarTimer = null;
+            }
+
+            // 立即显示侧边栏，不使用延迟
             if (!this.visible) {
+                console.log('[QuickTap Debug] Sidebar not visible, calling show() from triggerZone mouseenter (immediate)');
                 this.show();
+                this.lastShowTime = Date.now(); // 记录显示时间
+            } else {
+                console.log('[QuickTap Debug] Sidebar already visible, not calling show() from triggerZone mouseenter');
             }
         });
         this.triggerZone.addEventListener('mouseleave', () => {
-            // 鼠标离开触发区，不做特殊处理
-            // 指示线的显示状态完全由hide和show方法控制
+            console.log('[QuickTap Debug] Mouse left triggerZone'); // Add log
+
+            // 清除可能存在的显示定时器，防止离开后仍然触发显示
+            if (this.showSidebarTimer) {
+                clearTimeout(this.showSidebarTimer);
+                this.showSidebarTimer = null;
+                console.log('[QuickTap Debug] Cleared showSidebarTimer on triggerZone mouseleave');
+            }
+
+            // 鼠标离开触发区，如果侧边栏未显示，则启动闲置计时器
+            if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
+                console.log('[QuickTap Debug] Sidebar hidden and triggerZone visible, starting idle timer...');
+                if (this.triggerIdleTimer) {
+                    clearTimeout(this.triggerIdleTimer);
+                }
+                this.triggerIdleTimer = setTimeout(() => {
+                    console.log('[QuickTap Debug] Idle timer fired');
+                    // 检查条件再次满足时才添加idle类
+                    if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
+                        this.triggerZone.classList.add('idle');
+                        console.log('[QuickTap Debug] Added idle class to triggerZone. Classes:', this.triggerZone.classList.toString());
+                    } else {
+                        console.log('[QuickTap Debug] Condition not met for adding idle class');
+                    }
+                    this.triggerIdleTimer = null; // 清除计时器引用
+                }, this.IDLE_DELAY); // 使用常量 IDLE_DELAY
+            } else {
+                console.log(`[QuickTap Debug] Not starting idle timer (sidebar visible: ${this.visible})`);
+            }
         });
 
         // Load shortcut settings
         try {
             // 检查chrome API是否可用
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                chrome.storage.sync.get(['shortcut'], (result) => {
-                    try {
-                        if (chrome.runtime.lastError) {
-                            console.warn('Error loading shortcut settings:', chrome.runtime.lastError);
-                            return;
-                        }
+                // 使用Promise包装异步调用，确保在初始化完成前加载快捷键设置
+                const loadShortcut = async () => {
+                    return new Promise((resolve) => {
+                        chrome.storage.sync.get(['shortcut'], (result) => {
+                            try {
+                                if (chrome.runtime.lastError) {
+                                    console.warn('Error loading shortcut settings:', chrome.runtime.lastError);
+                                    resolve(false);
+                                    return;
+                                }
 
-                        if (result && result.shortcut) {
-                            console.log('Loaded shortcut settings:', result.shortcut);
-                            this.shortcut = result.shortcut;
-                        }
-                    } catch (error) {
-                        console.error('Error processing shortcut settings:', error);
-                    }
+                                if (result && result.shortcut) {
+                                    console.log('[QuickTap Debug] Loaded shortcut settings:', JSON.stringify(result.shortcut));
+                                    this.shortcut = result.shortcut;
+                                    resolve(true);
+                                } else {
+                                    console.log('[QuickTap Debug] No shortcut settings found, using default');
+                                    resolve(false);
+                                }
+                            } catch (error) {
+                                console.error('Error processing shortcut settings:', error);
+                                resolve(false);
+                            }
+                        });
+                    });
+                };
+
+                // 立即执行加载
+                loadShortcut().then(success => {
+                    console.log('[QuickTap Debug] Shortcut loading completed, success:', success);
+                    console.log('[QuickTap Debug] Current shortcut setting:',
+                                'Key:', this.shortcut.key,
+                                'Ctrl:', this.shortcut.ctrl,
+                                'Alt:', this.shortcut.alt,
+                                'Shift:', this.shortcut.shift,
+                                'Command:', this.shortcut.command);
                 });
             } else {
                 console.warn('Chrome storage sync API not available, using default shortcut settings');
@@ -186,7 +274,7 @@ class QuickTap {
 
         // Create popup container
         this.popup = document.createElement('div');
-        this.popup.className = 'quicktap-popup quicktap-extension visible';
+        this.popup.className = 'quicktap-popup quicktap-extension';
         this.popup.innerHTML = `
             <div class="quicktap-container">
                 <div class="quicktap-apps">
@@ -196,10 +284,7 @@ class QuickTap {
             </div>
         `;
 
-        // 创建拖拽指示线，仅依赖 CSS 控制样式
-        this.dragGuideLine = document.createElement('div');
-        this.dragGuideLine.className = 'drag-guide-line quicktap-extension';
-        this.dragGuideLine.style.display = 'none';
+        // 拖拽排序功能已移除
 
         // Create context menu
         this.contextMenu = document.createElement('div');
@@ -254,11 +339,7 @@ class QuickTap {
         document.body.appendChild(this.contextMenu);
         document.body.appendChild(this.editModal);
 
-        // 将拖拽指示线添加到侧边栏内部
-        const appList = this.popup.querySelector('.app-list');
-        if (appList) {
-            appList.appendChild(this.dragGuideLine);
-        }
+        // 拖拽排序功能已移除
 
         // 缓存常用 DOM 元素引用
         this.domElements.appList = this.popup.querySelector('.app-list');
@@ -331,39 +412,79 @@ class QuickTap {
             }
         });
 
-        this.popup.addEventListener('mouseleave', () => {
+        this.popup.addEventListener('mouseleave', (e) => {
+            console.log('[QuickTap Debug] Mouse left popup'); // Add log
+
+            // 检查鼠标是否移动到了侧边栏和屏幕边缘之间的区域
+            // 如果鼠标位置在侧边栏左侧（即屏幕边缘和侧边栏之间），则不隐藏侧边栏
+            if (e.clientX < this.popup.getBoundingClientRect().left && e.clientX >= 0) {
+                console.log('[QuickTap Debug] Mouse moved to the area between sidebar and screen edge, not hiding');
+                return;
+            }
+
             // 鼠标离开侧边栏时，立即隐藏
             const isEditVisible = this.editModal && this.editModal.style.display !== 'none';
             const isContextMenuVisible = this.contextMenu && this.contextMenu.style.display === 'block';
+
             if (this.visible && !isEditVisible && !isContextMenuVisible) {
                 // 立即隐藏，不再使用定时器
+                console.log('[QuickTap Debug] Conditions met, calling hide() from popup mouseleave');
                 this.hide();
-                if (this.hideTimer) {
-                    clearTimeout(this.hideTimer);
-                    this.hideTimer = null;
-                }
+                // Redundant timer clear, hide() handles this now
+                // if (this.hideTimer) {
+                //     clearTimeout(this.hideTimer);
+                //     this.hideTimer = null;
+                //     console.log('[QuickTap Debug] Cleared hideTimer in popup mouseleave (should not happen)');
+                // }
+            } else {
+                console.log(`[QuickTap Debug] Conditions not met for hiding from popup mouseleave (visible: ${this.visible}, editVisible: ${isEditVisible}, contextMenuVisible: ${isContextMenuVisible})`);
             }
         });
 
-        // 快捷键不再切换侧边栏显示状态
-        // document.addEventListener('keydown', (e) => {
-        //     // Skip if the active element is an input field
-        //     if (document.activeElement.tagName === 'INPUT' ||
-        //         document.activeElement.tagName === 'TEXTAREA' ||
-        //         document.activeElement.isContentEditable) {
-        //         return;
-        //     }
+        // 添加快捷键切换侧边栏显示状态
+        document.addEventListener('keydown', (e) => {
+            // 输出当前按下的键和快捷键设置，用于调试
+            console.log('[QuickTap Debug] Key pressed:', e.key.toLowerCase(),
+                        'Ctrl:', e.ctrlKey,
+                        'Alt:', e.altKey,
+                        'Shift:', e.shiftKey,
+                        'Meta:', e.metaKey);
+            console.log('[QuickTap Debug] Current shortcut setting:',
+                        'Key:', this.shortcut.key,
+                        'Ctrl:', this.shortcut.ctrl,
+                        'Alt:', this.shortcut.alt,
+                        'Shift:', this.shortcut.shift,
+                        'Command:', this.shortcut.command);
 
-        //     // Check if the pressed keys match the custom shortcut
-        //     if (e.key.toLowerCase() === this.shortcut.key &&
-        //         e.ctrlKey === this.shortcut.ctrl &&
-        //         e.altKey === this.shortcut.alt &&
-        //         e.shiftKey === this.shortcut.shift &&
-        //         e.metaKey === this.shortcut.command) {
-        //         e.preventDefault();
-        //         this.togglePopup();
-        //     }
-        // });
+            // Skip if the active element is an input field
+            if (document.activeElement.tagName === 'INPUT' ||
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.isContentEditable) {
+                console.log('[QuickTap Debug] Ignoring shortcut in input field:', document.activeElement.tagName);
+                return;
+            }
+
+            // Check if the pressed keys match the custom shortcut
+            const keyMatches = e.key.toLowerCase() === this.shortcut.key;
+            const ctrlMatches = e.ctrlKey === !!this.shortcut.ctrl;
+            const altMatches = e.altKey === !!this.shortcut.alt;
+            const shiftMatches = e.shiftKey === !!this.shortcut.shift;
+            // 处理command属性，如果不存在则默认为false
+            const metaMatches = e.metaKey === !!(this.shortcut.command || false);
+
+            console.log('[QuickTap Debug] Shortcut match check:',
+                        'Key:', keyMatches,
+                        'Ctrl:', ctrlMatches,
+                        'Alt:', altMatches,
+                        'Shift:', shiftMatches,
+                        'Meta:', metaMatches);
+
+            if (keyMatches && ctrlMatches && altMatches && shiftMatches && metaMatches) {
+                e.preventDefault();
+                console.log('[QuickTap Debug] Shortcut detected, toggling sidebar');
+                this.togglePopup();
+            }
+        });
 
         // 不在这里添加事件监听器，因为此时还没有添加按钮
         // 添加按钮的事件监听器会在loadApps方法中添加
@@ -500,15 +621,8 @@ class QuickTap {
         // Load saved apps
         this.loadApps();
 
-        // 默认隐藏侧边栏，不再自动显示
-        const self = this;
-        setTimeout(() => {
-            if (typeof self.hide === 'function') {
-                self.hide();
-            } else {
-                console.warn('hide 方法不存在');
-            }
-        }, 500);
+        // 侧边栏默认已隐藏，指示条已设置为闲置状态
+        console.log('[QuickTap Debug] Sidebar initialized in hidden state with idle indicator');
 
         // 定期更新图标活跃状态
         this.updateActiveStatus();
@@ -527,7 +641,7 @@ class QuickTap {
         container.title = app.title;
         container.dataset.index = index;
         container.dataset.url = app.url;
-        container.draggable = true;
+        // 拖拽功能已移除，不再需要draggable属性
 
         const img = document.createElement('img');
         img.alt = app.title;
@@ -540,148 +654,31 @@ class QuickTap {
         container.appendChild(img);
         container.appendChild(indicator);
 
-        // 拖拽相关
-        container.addEventListener('dragstart', (e) => {
-            this.isDragging = true;
-            container.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', container.dataset.index);
-            e.dataTransfer.effectAllowed = 'move';
-            setTimeout(() => { container.style.opacity = '0.5'; }, 0);
-            if (this.dragGuideLine) this.dragGuideLine.style.display = 'none';
-            e.stopPropagation();
-        });
-        container.addEventListener('dragend', (e) => {
-            this.isDragging = false;
-            container.classList.remove('dragging');
-            container.style.opacity = '1';
-            [...this.popup.querySelectorAll('.app-icon')].forEach(icon => icon.classList.remove('drag-over'));
-            if (this.dragGuideLine) this.dragGuideLine.style.display = 'none';
-            e.stopPropagation();
-        });
-        container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            container.classList.add('drag-over');
-            if (this.showGuideLineAt) this.showGuideLineAt(container);
-            e.stopPropagation();
-        });
-        container.addEventListener('dragleave', (e) => {
-            container.classList.remove('drag-over');
-            e.stopPropagation();
-        });
-        container.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.handleDrop(e, container);
-        });
-
         // 右键菜单
         container.addEventListener('contextmenu', (e) => {
             this.showContextMenu(e, index);
         });
         // 点击跳转
         container.addEventListener('click', (e) => {
-            if (!this.isDragging) {
-                if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-                    window.open(app.url, '_blank');
-                    e.preventDefault();
-                    return;
-                }
-                try {
-                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: app.url }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            window.open(app.url, '_blank');
-                            return;
-                        }
-                    });
-                } catch { window.open(app.url, '_blank'); }
+            if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+                window.open(app.url, '_blank');
+                e.preventDefault();
+                return;
             }
+            try {
+                chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: app.url }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        window.open(app.url, '_blank');
+                        return;
+                    }
+                });
+            } catch { window.open(app.url, '_blank'); }
             e.preventDefault();
         });
         return container;
     }
 
-    // Show guide line at the target container position
-    showGuideLineAt(container) {
-        if (!container || !this.isDragging) return;
-
-        // 获取当前拖拽的元素
-        const draggedElement = this.popup.querySelector('.app-icon.dragging');
-        if (!draggedElement) return;
-
-        const draggedIndex = parseInt(draggedElement.dataset.index);
-        const targetIndex = parseInt(container.dataset.index);
-
-        // 拖拽到自己身上时不显示指示线
-        if (draggedIndex === targetIndex) {
-            this.removeAllGuideLines();
-            if (this.dragGuideLine && this.dragGuideLine.parentNode) {
-                this.dragGuideLine.style.display = 'none';
-            }
-            return;
-        }
-
-        // 移除所有图标的 border
-        this.removeAllGuideLines();
-
-        // 计算插入位置
-        const appList = this.popup.querySelector('.app-list');
-        if (!appList) return;
-
-        // 显示 drag-guide-line
-        this.dragGuideLine.style.display = 'block';
-
-        // 计算指示线的 top 位置（绝对定位，不插入 DOM 顺序）
-        const rect = container.getBoundingClientRect();
-        const listRect = appList.getBoundingClientRect();
-        let top = 0;
-        let prevIcon = null;
-        if (draggedIndex < targetIndex) {
-            // 指示线应在目标图标的下方和下一个图标的中间（支持 add-app-btn）
-            prevIcon = container;
-            let nextIcon = container.nextElementSibling;
-            // 跳过非图标元素，但允许 add-app-btn
-            while (nextIcon && !nextIcon.classList.contains('app-icon') && !nextIcon.classList.contains('add-app-btn')) {
-                nextIcon = nextIcon.nextElementSibling;
-            }
-            const prevRect = prevIcon.getBoundingClientRect();
-            const nextRect = nextIcon ? nextIcon.getBoundingClientRect() : prevRect;
-            // 如果有下一个元素（图标或添加按钮），取两者中点，否则贴在最后一个元素下方
-            top = nextIcon
-                ? (prevRect.bottom + nextRect.top) / 2 - listRect.top
-                : prevRect.bottom - listRect.top;
-        } else {
-            // 指示线应在目标图标的上方和前一个元素的中间（支持 add-app-btn）
-            let prevIcon = container.previousElementSibling;
-            while (prevIcon && !prevIcon.classList.contains('app-icon') && !prevIcon.classList.contains('add-app-btn')) {
-                prevIcon = prevIcon.previousElementSibling;
-            }
-            const prevRect = prevIcon ? prevIcon.getBoundingClientRect() : rect;
-            // 有前一个元素时取中点，否则贴在第一个元素上方
-            top = prevIcon
-                ? (prevRect.bottom + rect.top) / 2 - listRect.top
-                : rect.top - listRect.top;
-        }
-        this.dragGuideLine.style.top = `${top}px`;
-        if (appList.lastChild !== this.dragGuideLine) {
-            appList.appendChild(this.dragGuideLine);
-        }
-
-        // 存储目标索引
-        this.targetDropIndex = targetIndex;
-    }
-
-    // 移除所有图标的指示线样式
-    removeAllGuideLines() {
-        const allIcons = this.popup.querySelectorAll('.app-icon');
-        allIcons.forEach(icon => {
-            icon.classList.remove('drop-target-top', 'drop-target-bottom');
-        });
-        // 隐藏指示线
-        if (this.dragGuideLine) {
-            this.dragGuideLine.style.display = 'none';
-        }
-    }
+    // 拖拽排序相关方法已移除
 
     async loadApps() {
         try {
@@ -1331,104 +1328,61 @@ appList.appendChild(appIcon);
         }
     }
 
+    // 侧边栏显示方法
     show() {
+        console.log('[QuickTap Debug] show() called'); // Add log
+
+        // 防抖动：检查是否正在显示中
+        if (this.visible && this.popup && this.popup.classList.contains('visible')) {
+            console.log('[QuickTap Debug] Sidebar already visible, ignoring redundant show() call');
+            return;
+        }
+
         // 强制显示侧边栏
-        this.popup.classList.add('visible');
-        this.visible = true;
+        if (this.popup) {
+            this.popup.classList.add('visible');
+            this.visible = true;
+            console.log('[QuickTap Debug] Popup shown, visible set to true. Popup Classes:', this.popup.classList.toString());
 
-        // 添加临时样式确保侧边栏不会被隐藏
-        this.popup.style.opacity = '1';
-        this.popup.style.visibility = 'visible';
-        this.popup.style.left = '20px';
+            // 移除临时样式（如果之前添加过）
+            this.popup.style.opacity = '';
+            this.popup.style.visibility = '';
+            this.popup.style.left = '';
+        } else {
+            console.log('[QuickTap Debug] Popup not found in show()');
+        }
 
-        // 当侧边栏显示时，隐藏触发区域
+        // 当侧边栏显示时，完全隐藏触发区域（指示条）
         if (this.triggerZone) {
+            console.log('[QuickTap Debug] Updating triggerZone in show()');
+            this.triggerZone.style.display = 'none'; // 完全隐藏触发区域
             this.triggerZone.classList.remove('visible');
+            this.triggerZone.classList.remove('active');
             this.triggerZone.classList.remove('idle');
+            console.log('[QuickTap Debug] triggerZone hidden. Classes:', this.triggerZone.classList.toString());
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
+                console.log('[QuickTap Debug] Cleared triggerIdleTimer in show()');
             }
+        } else {
+            console.log('[QuickTap Debug] triggerZone not found in show()');
         }
-
-        // 清除可能存在的隐藏定时器
-        if (this.hideTimer) {
-            clearTimeout(this.hideTimer);
-            this.hideTimer = null;
-        }
-
-        console.log('侧边栏已强制显示（测试模式下不会自动隐藏）');
     }
 
     togglePopup() {
-        // 始终显示侧边栏，不再切换显示/隐藏状态
-        if (!this.visible) {
+        // 切换侧边栏的显示/隐藏状态
+        console.log('[QuickTap Debug] togglePopup called, current visible state:', this.visible);
+        if (this.visible) {
+            this.hide();
+        } else {
             this.show();
         }
     }
 
     // clearSearchResults 方法已移除，因为我们已经移除了搜索框
 
-    async handleDrop(e, container) {
-        try {
-            e.preventDefault();
-            container.classList.remove('drag-over');
-
-            // 移除所有图标的指示线样式
-            this.removeAllGuideLines();
-            console.log('[拖拽排序] 移除所有指示线样式');
-
-            if (!e.dataTransfer) return;
-
-            // 获取拖拽的源索引
-            const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-
-            // 使用 targetDropIndex 作为目标索引，如果没有则使用容器的索引
-            const toIndex = this.targetDropIndex !== undefined ? this.targetDropIndex : parseInt(container.dataset.index);
-            console.log(`[拖拽排序] 目标索引: ${toIndex}, 源索引: ${fromIndex}`);
-
-            // 重置目标索引
-            this.targetDropIndex = undefined;
-
-            if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) {
-                console.log('[拖拽排序] 索引无效或相同，不执行排序');
-                return;
-            }
-
-            const apps = await this.getApps();
-            if (!Array.isArray(apps) || fromIndex < 0 || fromIndex >= apps.length || toIndex < 0 || toIndex >= apps.length) {
-                console.log(`[拖拽排序] 索引越界: fromIndex=${fromIndex}, toIndex=${toIndex}, apps.length=${apps ? apps.length : 'undefined'}`);
-                return;
-            }
-
-            // 重新排序 - 只在松开鼠标后才执行
-            const [movedApp] = apps.splice(fromIndex, 1);
-            const insertIndex = fromIndex < toIndex ? toIndex : toIndex;
-            apps.splice(insertIndex, 0, movedApp);
-
-            console.log(`[拖拽排序] from ${fromIndex} → ${toIndex}，插入索引: ${insertIndex}`);
-            console.log('[拖拽排序] 新顺序:', apps.map(a => a.title));
-
-            // 保存新排序到存储
-            await new Promise((resolve, reject) => {
-                chrome.storage.local.set({ apps }, () => {
-                    if (chrome.runtime.lastError) {
-                        console.error('[拖拽排序] 保存失败:', chrome.runtime.lastError);
-                        reject(new Error(chrome.runtime.lastError.message));
-                        return;
-                    }
-                    console.log('[拖拽排序] 排序已保存到存储');
-                    resolve();
-                });
-            });
-
-            // 拖拽后立即刷新UI和索引
-            await this.loadApps();
-            console.log('[拖拽排序] 拖拽后已强制刷新UI');
-        } catch (error) {
-            console.error('[拖拽排序] handleDrop异常:', error);
-        }
-    }
+    // 拖拽排序相关方法已移除
 
     // 获取当前所有打开的标签页
     async getOpenTabs() {
@@ -1439,32 +1393,41 @@ appList.appendChild(appIcon);
                     try {
                         // 设置超时处理
                         const timeoutId = setTimeout(() => {
-                            console.warn('getOpenTabs request timed out');
+                            console.info('Note: getOpenTabs request timed out, using empty tabs list');
                             resolve([]);
-                        }, 2000); // 2秒超时
+                        }, 3000); // 增加到3秒超时
 
                         chrome.runtime.sendMessage({ action: 'getOpenTabs' }, (response) => {
-                            clearTimeout(timeoutId); // 清除超时定时器
+                            clearTimeout(timeoutId);
 
+                            // 检查运行时错误
                             if (chrome.runtime.lastError) {
-                                // 将错误级别从 warn 降低到 info，因为这不是严重错误
-                                console.info('Note: Error getting open tabs:', chrome.runtime.lastError.message || 'Unknown error');
+                                console.info('Note: Chrome runtime returned error for getOpenTabs:',
+                                    chrome.runtime.lastError.message || 'Unknown error');
                                 resolve([]);
                                 return;
                             }
-                            resolve(response && response.tabs ? response.tabs : []);
+
+                            // 验证响应数据
+                            if (!response || !Array.isArray(response.tabs)) {
+                                console.info('Note: Invalid response format from getOpenTabs');
+                                resolve([]);
+                                return;
+                            }
+
+                            resolve(response.tabs);
                         });
                     } catch (sendError) {
-                        console.info('Note: Could not send message to get open tabs:', sendError.message || sendError);
+                        console.info('Note: Failed to send getOpenTabs message:',
+                            sendError.message || sendError);
                         resolve([]);
                     }
                 } else {
-                    // 将错误级别从 warn 降低到 info，因为这不是严重错误
-                    console.info('Note: Chrome runtime API not available for getting open tabs');
+                    console.info('Note: Chrome runtime API not available for getOpenTabs');
                     resolve([]);
                 }
             } catch (error) {
-                console.error('Error in getOpenTabs:', error);
+                console.error('Unexpected error in getOpenTabs:', error);
                 resolve([]);
             }
         });
@@ -1769,36 +1732,64 @@ appList.appendChild(appIcon);
         }
     }
 
-    // 侧边栏自动隐藏实现
-    show() {
-        if (this.popup) {
-            this.popup.classList.add('visible');
-            this.visible = true;
-        }
-        if (this.triggerZone) {
-            this.triggerZone.classList.remove('active');
-            this.triggerZone.classList.remove('visible');
-        }
-    }
+    // 侧边栏自动隐藏实现 - 已移至上方的show()方法
 
     hide() {
+        console.log('[QuickTap Debug] hide() called'); // Add log
+
+        // 防抖动：检查是否已经隐藏
+        if (!this.visible && this.popup && !this.popup.classList.contains('visible')) {
+            console.log('[QuickTap Debug] Sidebar already hidden, ignoring redundant hide() call');
+            return;
+        }
+
         if (this.popup) {
             this.popup.classList.remove('visible');
             this.visible = false;
+            console.log('[QuickTap Debug] Popup hidden, visible set to false. Popup Classes:', this.popup.classList.toString());
+        } else {
+            console.log('[QuickTap Debug] Popup not found in hide()');
         }
         if (this.triggerZone) {
-            this.triggerZone.classList.add('active');
-            this.triggerZone.classList.add('visible');
-
-            // 设置闲置定时器，2秒后添加idle类
+            console.log('[QuickTap Debug] Updating triggerZone in hide()');
+            // 清除可能存在的闲置定时器
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
+                this.triggerIdleTimer = null;
+                console.log('[QuickTap Debug] Cleared triggerIdleTimer in hide()');
             }
-            this.triggerIdleTimer = setTimeout(() => {
-                if (!this.visible) {
-                    this.triggerZone.classList.add('idle');
+
+            // 隐藏触发区域，稍后再显示
+            this.triggerZone.style.display = 'none';
+
+            // 延迟0.5秒后显示触发区域
+            setTimeout(() => {
+                if (!this.visible && this.triggerZone) {
+                    // 重置动画，确保每次都能重新触发
+                    this.triggerZone.classList.remove('idle'); // 先移除idle类，确保动画效果正常
+
+                    // 重置伪元素的动画，这里使用一个技巧来强制重新触发动画
+                    this.triggerZone.classList.remove('animate-indicator');
+                    void this.triggerZone.offsetWidth; // 触发重排，重置动画
+                    this.triggerZone.classList.add('animate-indicator');
+
+                    // 显示触发区域（半透明白色指示条）
+                    this.triggerZone.style.display = 'block';
+                    console.log('[QuickTap Debug] triggerZone shown after delay with animation. Classes:', this.triggerZone.classList.toString());
+
+                    // 启动闲置定时器，在一段时间后使指示线变得更微弱
+                    this.triggerIdleTimer = setTimeout(() => {
+                        console.log('[QuickTap Debug] Idle timer fired in hide()');
+                        if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
+                            this.triggerZone.classList.add('idle');
+                            console.log('[QuickTap Debug] Added idle class to triggerZone in hide(). Classes:', this.triggerZone.classList.toString());
+                        }
+                        this.triggerIdleTimer = null;
+                    }, this.IDLE_DELAY);
                 }
-            }, this.IDLE_DELAY);
+            }, 500); // 0.5秒延迟
+        } else {
+            console.log('[QuickTap Debug] triggerZone not found in hide()');
         }
     }
 
@@ -1858,12 +1849,21 @@ try {
                     return;
                 }
 
-                // 不再切换侧边栏显示状态
-                // if (request.action === 'toggle') {
-                //     window.quickTap.togglePopup();
-                // } else
-                if (request.action === 'updateShortcut') {
+                // 处理切换侧边栏显示状态的请求
+                if (request.action === 'toggle') {
+                    console.log('[QuickTap Debug] Received toggle message from extension');
+                    window.quickTap.togglePopup();
+                } else
+                if (request.action === 'updateShortcut' && request.shortcut) {
+                    // 处理快捷键更新消息
+                    console.log('[QuickTap Debug] Received shortcut update:', JSON.stringify(request.shortcut));
                     window.quickTap.shortcut = request.shortcut;
+                    console.log('[QuickTap Debug] Shortcut updated to:',
+                                'Key:', window.quickTap.shortcut.key,
+                                'Ctrl:', window.quickTap.shortcut.ctrl,
+                                'Alt:', window.quickTap.shortcut.alt,
+                                'Shift:', window.quickTap.shortcut.shift,
+                                'Command:', window.quickTap.shortcut.command);
                 } else if (request.action === 'tabsChanged') {
                     // 标签页变化时更新图标状态
                     window.quickTap.updateActiveStatus();

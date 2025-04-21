@@ -1,7 +1,12 @@
 // Listen for extension icon clicks
 chrome.action.onClicked.addListener((tab) => {
-    // 不再发送toggle消息，避免自动显示侧边栏
-    // chrome.tabs.sendMessage(tab.id, { action: 'toggle' });
+    // 发送toggle消息，切换侧边栏显示状态
+    chrome.tabs.sendMessage(tab.id, { action: 'toggle' }, (response) => {
+        // 忽略错误
+        if (chrome.runtime.lastError) {
+            console.debug('Could not send toggle message to tab:', tab.id, chrome.runtime.lastError);
+        }
+    });
 });
 
 // 监听标签页变化
