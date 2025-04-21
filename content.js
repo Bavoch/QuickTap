@@ -1345,7 +1345,8 @@ appList.appendChild(appIcon);
             console.log('[QuickTap Debug] Popup shown, visible set to true. Popup Classes:', this.popup.classList.toString());
 
             // 移除临时样式（如果之前添加过）
-            this.popup.style.opacity = '';
+            // 不再需要设置opacity，因为我们始终保持不透明度为1
+            // this.popup.style.opacity = '';
             this.popup.style.visibility = '';
             this.popup.style.left = '';
         } else {

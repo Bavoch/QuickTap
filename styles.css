@@ -33,20 +33,28 @@
 .quicktap-popup {
     position: fixed;
     top: 50%;
-    left: -80px;
+    left: -80px; /* 隐藏时移出屏幕 */
     transform: translateY(-50%);
-    opacity: 0;
+    opacity: 1; /* 始终保持不透明度为1 */
     visibility: hidden;
     z-index: 2147483645;
-    transition: opacity 0.3s, left 0.3s, visibility 0.3s;
+    transition: left 0.3s, visibility 0.3s; /* 只对位置和可见性应用过渡效果 */
+    /* 确保背景模糊效果始终存在，不受过渡影响 */
+    will-change: left, visibility;
     pointer-events: none;
+    /* 即使在不可见状态下也保持背景模糊效果 */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .quicktap-popup.visible {
-    left: 16px;
-    opacity: 1;
+    left: 16px; /* 显示时移入屏幕 */
+    /* opacity: 1; 不需要改变不透明度，始终为1 */
     visibility: visible;
     pointer-events: auto;
+    /* 保持背景模糊效果不变 */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .quicktap-container {
@@ -61,8 +69,7 @@
                 0px 2px 6px 0px rgba(0, 0, 0, 0.2);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    /* 背景模糊效果已移至.quicktap-popup */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
