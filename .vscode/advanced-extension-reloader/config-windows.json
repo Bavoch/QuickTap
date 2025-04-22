@@ -1,6 +1,6 @@
 {
     "port": 7220,  
-    "watch_dir": "D:/Coding/QuickTap",  
+    "watch_dir": "D:/Coding/side-dock",  
     "extension_id": "apelbgllgfnmoponbhdionfgjgaggbng", 
     "play_notifications": false
 }

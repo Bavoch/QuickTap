@@ -102,16 +102,16 @@ class SideDock {
 
     init() {
         // 检查是否已经初始化
-        if (this.isInitialized) {
-            console.warn('QuickTap already initialized, skipping initialization');
-            return;
+        if (window.sideDockInstance) {
+            console.warn('SideDock already initialized, skipping initialization');
+            return window.sideDockInstance;
         }
 
         console.log('Initializing SideDock...');
 
         // 移除可能存在的旧元素
         console.log('Removing existing SideDock elements...');
-        const existingElements = document.querySelectorAll('.quicktap-extension');
+        const existingElements = document.querySelectorAll('.sidedock-extension');
         console.log(`Found ${existingElements.length} existing elements to remove`);
         existingElements.forEach(element => {
             try {
@@ -122,9 +122,9 @@ class SideDock {
         });
 
         // 再次检查是否有元素没有被清除
-        const remainingElements = document.querySelectorAll('.quicktap-extension');
+        const remainingElements = document.querySelectorAll('.sidedock-extension');
         if (remainingElements.length > 0) {
-            console.warn(`Still have ${remainingElements.length} SideDock elements after cleanup, forcing removal`);
+            console.warn(`Still have ${remainingElements.length} sidedock elements after cleanup, forcing removal`);
             remainingElements.forEach(element => {
                 try {
                     if (element.parentNode) {
@@ -138,12 +138,12 @@ class SideDock {
 
         // Create overlay
         this.overlay = document.createElement('div');
-        this.overlay.className = 'quicktap-overlay quicktap-extension';
+        this.overlay.className = 'sidedock-overlay sidedock-extension';
         document.body.appendChild(this.overlay);
 
         // 创建屏幕边缘触发区域（半透明白色指示条）
         this.triggerZone = document.createElement('div');
-        this.triggerZone.className = 'quicktap-trigger-zone quicktap-extension';
+        this.triggerZone.className = 'sidedock-trigger-zone sidedock-extension';
         // 初始时显示触发区域，因为侧边栏默认不显示
         this.triggerZone.style.display = 'block';
         // 初始时将触发区域设置为闲置状态
@@ -161,24 +161,24 @@ class SideDock {
 
         // 添加触发区域的鼠标进入事件（立即触发，无延迟）
         this.triggerZone.addEventListener('mouseenter', () => {
-            console.log('[QuickTap Debug] Mouse entered triggerZone'); // Add log
+            console.log('[SideDock Debug] Mouse entered triggerZone'); // Add log
             // 清除可能存在的闲置定时器
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[QuickTap Debug] Cleared triggerIdleTimer on triggerZone mouseenter');
+                console.log('[SideDock Debug] Cleared triggerIdleTimer on triggerZone mouseenter');
             }
             // 移除idle状态，确保指示条完全可见
             if (this.triggerZone) {
                 // 强制移除idle类，确保指示线完全可见
                 this.triggerZone.classList.remove('idle');
-                console.log('[QuickTap Debug] Removed idle class from triggerZone on mouseenter. Classes:', this.triggerZone.classList.toString());
+                console.log('[SideDock Debug] Removed idle class from triggerZone on mouseenter. Classes:', this.triggerZone.classList.toString());
             }
 
             // 防抖动：检查距离上次显示的时间
             const now = Date.now();
             if (now - this.lastShowTime < 1000) { // 如果1秒内刚显示过，则不再触发
-                console.log('[QuickTap Debug] Ignoring rapid re-entry, last show was', now - this.lastShowTime, 'ms ago');
+                console.log('[SideDock Debug] Ignoring rapid re-entry, last show was', now - this.lastShowTime, 'ms ago');
                 return;
             }
 
@@ -190,42 +190,42 @@ class SideDock {
 
             // 立即显示侧边栏，不使用延迟
             if (!this.visible) {
-                console.log('[QuickTap Debug] Sidebar not visible, calling show() from triggerZone mouseenter (immediate)');
+                console.log('[SideDock Debug] Sidebar not visible, calling show() from triggerZone mouseenter (immediate)');
                 this.show();
                 this.lastShowTime = Date.now(); // 记录显示时间
             } else {
-                console.log('[QuickTap Debug] Sidebar already visible, not calling show() from triggerZone mouseenter');
+                console.log('[SideDock Debug] Sidebar already visible, not calling show() from triggerZone mouseenter');
             }
         });
         this.triggerZone.addEventListener('mouseleave', () => {
-            console.log('[QuickTap Debug] Mouse left triggerZone'); // Add log
+            console.log('[SideDock Debug] Mouse left triggerZone'); // Add log
 
             // 清除可能存在的显示定时器，防止离开后仍然触发显示
             if (this.showSidebarTimer) {
                 clearTimeout(this.showSidebarTimer);
                 this.showSidebarTimer = null;
-                console.log('[QuickTap Debug] Cleared showSidebarTimer on triggerZone mouseleave');
+                console.log('[SideDock Debug] Cleared showSidebarTimer on triggerZone mouseleave');
             }
 
             // 鼠标离开触发区，如果侧边栏未显示，则启动闲置计时器
             if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
-                console.log('[QuickTap Debug] Sidebar hidden and triggerZone visible, starting idle timer...');
+                console.log('[SideDock Debug] Sidebar hidden and triggerZone visible, starting idle timer...');
                 if (this.triggerIdleTimer) {
                     clearTimeout(this.triggerIdleTimer);
                 }
                 this.triggerIdleTimer = setTimeout(() => {
-                    console.log('[QuickTap Debug] Idle timer fired');
+                    console.log('[SideDock Debug] Idle timer fired');
                     // 检查条件再次满足时才添加idle类
                     if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
                         this.triggerZone.classList.add('idle');
-                        console.log('[QuickTap Debug] Added idle class to triggerZone. Classes:', this.triggerZone.classList.toString());
+                        console.log('[SideDock Debug] Added idle class to triggerZone. Classes:', this.triggerZone.classList.toString());
                     } else {
-                        console.log('[QuickTap Debug] Condition not met for adding idle class');
+                        console.log('[SideDock Debug] Condition not met for adding idle class');
                     }
                     this.triggerIdleTimer = null; // 清除计时器引用
                 }, this.IDLE_DELAY); // 使用常量 IDLE_DELAY
             } else {
-                console.log(`[QuickTap Debug] Not starting idle timer (sidebar visible: ${this.visible})`);
+                console.log(`[SideDock Debug] Not starting idle timer (sidebar visible: ${this.visible})`);
             }
         });
 
@@ -245,11 +245,11 @@ class SideDock {
                                 }
 
                                 if (result && result.shortcut) {
-                                    console.log('[QuickTap Debug] Loaded shortcut settings:', JSON.stringify(result.shortcut));
+                                    console.log('[SideDock Debug] Loaded shortcut settings:', JSON.stringify(result.shortcut));
                                     this.shortcut = result.shortcut;
                                     resolve(true);
                                 } else {
-                                    console.log('[QuickTap Debug] No shortcut settings found, using default');
+                                    console.log('[SideDock Debug] No shortcut settings found, using default');
                                     resolve(false);
                                 }
                             } catch (error) {
@@ -262,8 +262,8 @@ class SideDock {
 
                 // 立即执行加载
                 loadShortcut().then(success => {
-                    console.log('[QuickTap Debug] Shortcut loading completed, success:', success);
-                    console.log('[QuickTap Debug] Current shortcut setting:',
+                    console.log('[SideDock Debug] Shortcut loading completed, success:', success);
+                    console.log('[SideDock Debug] Current shortcut setting:',
                                 'Key:', this.shortcut.key,
                                 'Ctrl:', this.shortcut.ctrl,
                                 'Alt:', this.shortcut.alt,
@@ -279,21 +279,19 @@ class SideDock {
 
         // Create popup container
         this.popup = document.createElement('div');
-        this.popup.className = 'quicktap-popup quicktap-extension';
+        this.popup.className = 'sidedock-popup sidedock-extension';
         this.popup.innerHTML = `
-            <div class="quicktap-container">
-                <div class="quicktap-apps">
+            <div class="sidedock-container">
+                <div class="sidedock-apps">
                     <div class="app-list">
                     </div>
                 </div>
             </div>
         `;
 
-        // 拖拽排序功能已移除
-
         // Create context menu
         this.contextMenu = document.createElement('div');
-        this.contextMenu.className = 'context-menu quicktap-extension';
+        this.contextMenu.className = 'context-menu sidedock-extension';
         this.contextMenu.style.display = 'none';
         this.contextMenu.innerHTML = `
             <div class="context-menu-item edit">
@@ -306,7 +304,7 @@ class SideDock {
 
         // Create edit modal
         this.editModal = document.createElement('div');
-        this.editModal.className = 'edit-app-modal quicktap-extension';
+        this.editModal.className = 'edit-app-modal sidedock-extension';
         this.editModal.style.display = 'none';
         this.editModal.innerHTML = `
             <div class="header">
@@ -418,12 +416,12 @@ class SideDock {
         });
 
         this.popup.addEventListener('mouseleave', (e) => {
-            console.log('[QuickTap Debug] Mouse left popup'); // Add log
+            console.log('[SideDock Debug] Mouse left popup'); // Add log
 
             // 检查鼠标是否移动到了侧边栏和屏幕边缘之间的区域
             // 如果鼠标位置在侧边栏左侧（即屏幕边缘和侧边栏之间），则不隐藏侧边栏
             if (e.clientX < this.popup.getBoundingClientRect().left && e.clientX >= 0) {
-                console.log('[QuickTap Debug] Mouse moved to the area between sidebar and screen edge, not hiding');
+                console.log('[SideDock Debug] Mouse moved to the area between sidebar and screen edge, not hiding');
                 return;
             }
 
@@ -434,29 +432,29 @@ class SideDock {
             if (this.visible && !isEditVisible && !isContextMenuVisible) {
                // 延迟隐藏，给拖拽操作完成留出时间
                setTimeout(() => {
-                   console.log('[QuickTap Debug] Conditions met, calling hide() from popup mouseleave');
+                   console.log('[SideDock Debug] Conditions met, calling hide() from popup mouseleave');
                    this.hide();
                }, 200); // 200ms 延迟
                // Redundant timer clear, hide() handles this now
                 // if (this.hideTimer) {
                 //     clearTimeout(this.hideTimer);
                 //     this.hideTimer = null;
-                //     console.log('[QuickTap Debug] Cleared hideTimer in popup mouseleave (should not happen)');
+                //     console.log('[SideDock Debug] Cleared hideTimer in popup mouseleave (should not happen)');
                 // }
             } else {
-                console.log(`[QuickTap Debug] Conditions not met for hiding from popup mouseleave (visible: ${this.visible}, editVisible: ${isEditVisible}, contextMenuVisible: ${isContextMenuVisible})`);
+                console.log(`[SideDock Debug] Conditions not met for hiding from popup mouseleave (visible: ${this.visible}, editVisible: ${isEditVisible}, contextMenuVisible: ${isContextMenuVisible})`);
             }
         });
 
         // 添加快捷键切换侧边栏显示状态
         document.addEventListener('keydown', (e) => {
             // 输出当前按下的键和快捷键设置，用于调试
-            console.log('[QuickTap Debug] Key pressed:', e.key.toLowerCase(),
+            console.log('[SideDock Debug] Key pressed:', e.key.toLowerCase(),
                         'Ctrl:', e.ctrlKey,
                         'Alt:', e.altKey,
                         'Shift:', e.shiftKey,
                         'Meta:', e.metaKey);
-            console.log('[QuickTap Debug] Current shortcut setting:',
+            console.log('[SideDock Debug] Current shortcut setting:',
                         'Key:', this.shortcut.key,
                         'Ctrl:', this.shortcut.ctrl,
                         'Alt:', this.shortcut.alt,
@@ -467,7 +465,7 @@ class SideDock {
             if (document.activeElement.tagName === 'INPUT' ||
                 document.activeElement.tagName === 'TEXTAREA' ||
                 document.activeElement.isContentEditable) {
-                console.log('[QuickTap Debug] Ignoring shortcut in input field:', document.activeElement.tagName);
+                console.log('[SideDock Debug] Ignoring shortcut in input field:', document.activeElement.tagName);
                 return;
             }
 
@@ -479,7 +477,7 @@ class SideDock {
             // 处理command属性，如果不存在则默认为false
             const commandMatches = e.metaKey === !!this.shortcut.command;
 
-            console.log('[QuickTap Debug] Shortcut match check:',
+            console.log('[SideDock Debug] Shortcut match check:',
                         'Key:', keyMatches,
                         'Ctrl:', ctrlMatches,
                         'Alt:', altMatches,
@@ -488,7 +486,7 @@ class SideDock {
 
             if (keyMatches && ctrlMatches && altMatches && shiftMatches && commandMatches) {
                 e.preventDefault();
-                console.log('[QuickTap Debug] Shortcut detected, toggling sidebar');
+                console.log('[SideDock Debug] Shortcut detected, toggling sidebar');
                 this.togglePopup();
             }
         });
@@ -629,7 +627,7 @@ class SideDock {
         this.loadApps();
 
         // 侧边栏默认已隐藏，指示条已设置为闲置状态
-        console.log('[QuickTap Debug] Sidebar initialized in hidden state with idle indicator');
+        console.log('[SideDock Debug] Sidebar initialized in hidden state with idle indicator');
 
         // 定期更新图标活跃状态
         this.updateActiveStatus();
@@ -1542,11 +1540,11 @@ class SideDock {
 
     // 侧边栏显示方法
     show() {
-        console.log('[QuickTap Debug] show() called'); // Add log
+        console.log('[SideDock Debug] show() called'); // Add log
 
         // 防抖动：检查是否正在显示中
         if (this.visible && this.popup && this.popup.classList.contains('visible')) {
-            console.log('[QuickTap Debug] Sidebar already visible, ignoring redundant show() call');
+            console.log('[SideDock Debug] Sidebar already visible, ignoring redundant show() call');
             return;
         }
 
@@ -1554,7 +1552,7 @@ class SideDock {
         if (this.popup) {
             this.popup.classList.add('visible');
             this.visible = true;
-            console.log('[QuickTap Debug] Popup shown, visible set to true. Popup Classes:', this.popup.classList.toString());
+            console.log('[SideDock Debug] Popup shown, visible set to true. Popup Classes:', this.popup.classList.toString());
 
             // 移除临时样式（如果之前添加过）
             // 不再需要设置opacity，因为我们始终保持不透明度为1
@@ -1562,30 +1560,30 @@ class SideDock {
             this.popup.style.visibility = '';
             this.popup.style.left = '';
         } else {
-            console.log('[QuickTap Debug] Popup not found in show()');
+            console.log('[SideDock Debug] Popup not found in show()');
         }
 
         // 当侧边栏显示时，完全隐藏触发区域（指示条）
         if (this.triggerZone) {
-            console.log('[QuickTap Debug] Updating triggerZone in show()');
+            console.log('[SideDock Debug] Updating triggerZone in show()');
             this.triggerZone.style.display = 'none'; // 完全隐藏触发区域
             this.triggerZone.classList.remove('visible');
             this.triggerZone.classList.remove('active');
             this.triggerZone.classList.remove('idle');
-            console.log('[QuickTap Debug] triggerZone hidden. Classes:', this.triggerZone.classList.toString());
+            console.log('[SideDock Debug] triggerZone hidden. Classes:', this.triggerZone.classList.toString());
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[QuickTap Debug] Cleared triggerIdleTimer in show()');
+                console.log('[SideDock Debug] Cleared triggerIdleTimer in show()');
             }
         } else {
-            console.log('[QuickTap Debug] triggerZone not found in show()');
+            console.log('[SideDock Debug] triggerZone not found in show()');
         }
     }
 
     togglePopup() {
         // 切换侧边栏的显示/隐藏状态
-        console.log('[QuickTap Debug] togglePopup called, current visible state:', this.visible);
+        console.log('[SideDock Debug] togglePopup called, current visible state:', this.visible);
         if (this.visible) {
             this.hide();
         } else {
@@ -1948,28 +1946,28 @@ class SideDock {
     // 侧边栏自动隐藏实现 - 已移至上方的show()方法
 
     hide() {
-        console.log('[QuickTap Debug] hide() called'); // Add log
+        console.log('[SideDock Debug] hide() called'); // Add log
 
         // 防抖动：检查是否已经隐藏
         if (!this.visible && this.popup && !this.popup.classList.contains('visible')) {
-            console.log('[QuickTap Debug] Sidebar already hidden, ignoring redundant hide() call');
+            console.log('[SideDock Debug] Sidebar already hidden, ignoring redundant hide() call');
             return;
         }
 
         if (this.popup) {
             this.popup.classList.remove('visible');
             this.visible = false;
-            console.log('[QuickTap Debug] Popup hidden, visible set to false. Popup Classes:', this.popup.classList.toString());
+            console.log('[SideDock Debug] Popup hidden, visible set to false. Popup Classes:', this.popup.classList.toString());
         } else {
-            console.log('[QuickTap Debug] Popup not found in hide()');
+            console.log('[SideDock Debug] Popup not found in hide()');
         }
         if (this.triggerZone) {
-            console.log('[QuickTap Debug] Updating triggerZone in hide()');
+            console.log('[SideDock Debug] Updating triggerZone in hide()');
             // 清除可能存在的闲置定时器
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[QuickTap Debug] Cleared triggerIdleTimer in hide()');
+                console.log('[SideDock Debug] Cleared triggerIdleTimer in hide()');
             }
 
             // 隐藏触发区域，稍后再显示
@@ -1988,21 +1986,21 @@ class SideDock {
 
                     // 显示触发区域（半透明白色指示条）
                     this.triggerZone.style.display = 'block';
-                    console.log('[QuickTap Debug] triggerZone shown after delay with animation. Classes:', this.triggerZone.classList.toString());
+                    console.log('[SideDock Debug] triggerZone shown after delay with animation. Classes:', this.triggerZone.classList.toString());
 
                     // 启动闲置定时器，在一段时间后使指示线变得更微弱
                     this.triggerIdleTimer = setTimeout(() => {
-                        console.log('[QuickTap Debug] Idle timer fired in hide()');
+                        console.log('[SideDock Debug] Idle timer fired in hide()');
                         if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
                             this.triggerZone.classList.add('idle');
-                            console.log('[QuickTap Debug] Added idle class to triggerZone in hide(). Classes:', this.triggerZone.classList.toString());
+                            console.log('[SideDock Debug] Added idle class to triggerZone in hide(). Classes:', this.triggerZone.classList.toString());
                         }
                         this.triggerIdleTimer = null;
                     }, this.IDLE_DELAY);
                 }
             }, 500); // 0.5秒延迟
         } else {
-            console.log('[QuickTap Debug] triggerZone not found in hide()');
+            console.log('[SideDock Debug] triggerZone not found in hide()');
         }
     }
 
@@ -2025,7 +2023,7 @@ class SideDock {
     }
 }
 
-// 初始化 QuickTap
+// 初始化 SideDock
 (function() {
     try {
         // 检查是否已经创建了实例
@@ -2064,14 +2062,14 @@ try {
 
                 // 处理切换侧边栏显示状态的请求
                 if (request.action === 'toggle') {
-                    console.log('[QuickTap Debug] Received toggle message from extension');
+                    console.log('[SideDock Debug] Received toggle message from extension');
                     window.sideDock.togglePopup();
                 } else
                 if (request.action === 'updateShortcut' && request.shortcut) {
                     // 处理快捷键更新消息
-                    console.log('[QuickTap Debug] Received shortcut update:', JSON.stringify(request.shortcut));
+                    console.log('[SideDock Debug] Received shortcut update:', JSON.stringify(request.shortcut));
                     window.sideDock.shortcut = request.shortcut;
-                    console.log('[QuickTap Debug] Shortcut updated to:',
+                    console.log('[SideDock Debug] Shortcut updated to:',
                                 'Key:', window.sideDock.shortcut.key,
                                 'Ctrl:', window.sideDock.shortcut.ctrl,
                                 'Alt:', window.sideDock.shortcut.alt,

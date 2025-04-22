@@ -1,5 +1,5 @@
-.quicktap-popup,
-.quicktap-popup *,
+.sidedock-popup,
+.sidedock-popup *,
 .context-menu,
 .context-menu *,
 .icon-context-menu,
@@ -13,7 +13,7 @@
     font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
-.quicktap-overlay {
+.sidedock-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -25,12 +25,12 @@
     visibility: hidden;
 }
 
-.quicktap-overlay.visible {
+.sidedock-overlay.visible {
     pointer-events: auto;
     visibility: visible;
 }
 
-.quicktap-popup {
+.sidedock-popup {
     position: fixed;
     top: 50%;
     left: -80px; /* 隐藏时移出屏幕 */
@@ -47,7 +47,7 @@
     -webkit-backdrop-filter: blur(10px);
 }
 
-.quicktap-popup.visible {
+.sidedock-popup.visible {
     left: 16px; /* 显示时移入屏幕 */
     /* opacity: 1; 不需要改变不透明度，始终为1 */
     visibility: visible;
@@ -57,7 +57,7 @@
     -webkit-backdrop-filter: blur(10px);
 }
 
-.quicktap-container {
+.sidedock-container {
     width: 64px;
     height: auto;
     max-height: 80vh;
@@ -82,7 +82,7 @@
     position: relative;
 }
 
-.quicktap-apps {
+.sidedock-apps {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -96,7 +96,7 @@
     overflow: visible;
 }
 
-.quicktap-apps::-webkit-scrollbar {
+.sidedock-apps::-webkit-scrollbar {
     display: none;
 }
 
@@ -204,7 +204,7 @@
     z-index: 10;
 }
 
-.quicktap-extension .plus-icon {
+.sidedock-extension .plus-icon {
     width: 100%;
     height: 100%;
     position: relative;
@@ -214,7 +214,7 @@
     pointer-events: none;
 }
 
-.quicktap-extension .plus-icon .icon {
+.sidedock-extension .plus-icon .icon {
     width: 24px;
     height: 24px;
     position: absolute;
@@ -224,22 +224,22 @@
     overflow: hidden;
 }
 
-.quicktap-extension .plus-icon .icon::before,
-.quicktap-extension .plus-icon .icon::after {
+.sidedock-extension .plus-icon .icon::before,
+.sidedock-extension .plus-icon .icon::after {
     content: '';
     position: absolute;
     background: rgba(255, 255, 255, 0.7);
     pointer-events: none;
 }
 
-.quicktap-extension .plus-icon .icon::before {
+.sidedock-extension .plus-icon .icon::before {
     width: 14px;
     height: 2px;
     left: 5px;
     top: 11px;
 }
 
-.quicktap-extension .plus-icon .icon::after {
+.sidedock-extension .plus-icon .icon::after {
     width: 2px;
     height: 14px;
     left: 11px;
@@ -431,7 +431,7 @@
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 
-.quicktap-trigger-zone {
+.sidedock-trigger-zone {
     position: fixed;
     top: 50%;
     transform: translateY(-50%);
@@ -446,7 +446,7 @@
 }
 
 /* 实际的可见指示条 */
-.quicktap-trigger-zone::after {
+.sidedock-trigger-zone::after {
     content: '';
     position: absolute;
     left: 20px; /* 调整位置，保持距离屏幕边缘10px */
@@ -462,17 +462,17 @@
 }
 
 /* 使用类来控制动画，这样可以通过添加/移除类来重新触发动画 */
-.quicktap-trigger-zone.animate-indicator::after {
+.sidedock-trigger-zone.animate-indicator::after {
     animation: indicatorAppear 0.5s ease-out; /* 增加动画时间到 0.5 秒，使其更加平滑 */
 }
 
-.quicktap-trigger-zone.idle::after {
+.sidedock-trigger-zone.idle::after {
     opacity: 0.15; /* 降低透明度，使指示线更微弱 */
     transition: opacity 0.3s;
 }
 
 /* 当侧边栏可见时，完全隐藏指示条 */
-.quicktap-popup.visible ~ .quicktap-trigger-zone::after {
+.sidedock-popup.visible ~ .sidedock-trigger-zone::after {
     opacity: 0;
 }
 
