@@ -377,16 +377,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         try {
             if (!request.apps) {
                 console.warn('No apps provided for updateApps action');
-                return;
+                sendResponse({ success: false, error: 'No apps provided' });
+                return true;
             }
 
             chrome.storage.local.set({ apps: request.apps }, () => {
                 if (chrome.runtime.lastError) {
                     console.error('Error saving apps:', chrome.runtime.lastError);
+                    sendResponse({ success: false, error: chrome.runtime.lastError.message || 'Error saving apps' });
+                } else {
+                    sendResponse({ success: true });
                 }
             });
+            return true; // 保持消息通道开放，允许异步响应
         } catch (error) {
             console.error('Error in updateApps:', error);
+            sendResponse({ success: false, error: error.message || 'Error processing updateApps request' });
+            return true;
         }
     }
     } catch (error) {

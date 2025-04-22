@@ -69,7 +69,6 @@
                 0px 2px 6px 0px rgba(0, 0, 0, 0.2);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    /* 背景模糊效果已移至.quicktap-popup */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -172,8 +171,9 @@
     filter: brightness(0.8);
 }
 
-.app-icon {
-    cursor: grab;
+/* 移除重复的光标样式定义，使用上面定义的pointer样式 */
+.app-icon.dragging {
+    cursor: grabbing;
 }
 
 .app-icon.duplicate-highlight {

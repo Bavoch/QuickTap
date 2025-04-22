@@ -1,14 +1,14 @@
-class QuickTap {
+class SideDock {
     constructor() {
         // 检查是否已经创建了实例
-        if (window.quickTap) {
-            console.warn('QuickTap instance already exists, returning existing instance');
-            return window.quickTap;
+        if (window.sideDock) {
+            console.warn('SideDock instance already exists, returning existing instance');
+            return window.sideDock;
         }
 
         // 将实例绑定到全局变量
-        window.quickTap = this;
-        console.log('Creating new QuickTap instance');
+        window.sideDock = this;
+        console.log('Creating new SideDock instance');
 
         // 基本属性
         this.popup = null;
@@ -107,10 +107,10 @@ class QuickTap {
             return;
         }
 
-        console.log('Initializing QuickTap...');
+        console.log('Initializing SideDock...');
 
         // 移除可能存在的旧元素
-        console.log('Removing existing QuickTap elements...');
+        console.log('Removing existing SideDock elements...');
         const existingElements = document.querySelectorAll('.quicktap-extension');
         console.log(`Found ${existingElements.length} existing elements to remove`);
         existingElements.forEach(element => {
@@ -124,7 +124,7 @@ class QuickTap {
         // 再次检查是否有元素没有被清除
         const remainingElements = document.querySelectorAll('.quicktap-extension');
         if (remainingElements.length > 0) {
-            console.warn(`Still have ${remainingElements.length} QuickTap elements after cleanup, forcing removal`);
+            console.warn(`Still have ${remainingElements.length} SideDock elements after cleanup, forcing removal`);
             remainingElements.forEach(element => {
                 try {
                     if (element.parentNode) {
@@ -477,16 +477,16 @@ class QuickTap {
             const altMatches = e.altKey === !!this.shortcut.alt;
             const shiftMatches = e.shiftKey === !!this.shortcut.shift;
             // 处理command属性，如果不存在则默认为false
-            const metaMatches = e.metaKey === !!(this.shortcut.command || false);
+            const commandMatches = e.metaKey === !!this.shortcut.command;
 
             console.log('[QuickTap Debug] Shortcut match check:',
                         'Key:', keyMatches,
                         'Ctrl:', ctrlMatches,
                         'Alt:', altMatches,
                         'Shift:', shiftMatches,
-                        'Meta:', metaMatches);
+                        'Command:', commandMatches);
 
-            if (keyMatches && ctrlMatches && altMatches && shiftMatches && metaMatches) {
+            if (keyMatches && ctrlMatches && altMatches && shiftMatches && commandMatches) {
                 e.preventDefault();
                 console.log('[QuickTap Debug] Shortcut detected, toggling sidebar');
                 this.togglePopup();
@@ -637,7 +637,7 @@ class QuickTap {
 
         // 设置初始化标志
         this.isInitialized = true;
-        console.log('QuickTap initialization complete');
+        console.log('SideDock initialization complete');
     }
 
     createAppIcon(app, index) {
@@ -688,11 +688,11 @@ class QuickTap {
     // 获取拖拽目标位置的辅助方法
     getDragAfterElement(container, y) {
         const draggableElements = [...this.popup.querySelectorAll('.app-icon:not(.dragging)')];
-        
+
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
             const offset = y - box.top - box.height / 2;
-            
+
             if (offset < 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
@@ -918,7 +918,22 @@ class QuickTap {
                         return;
                     }
 
-                    // console.log('Drop event triggered');
+                    console.log('[DEBUG] Drop event triggered');
+
+                    // Monkey patch chrome.runtime.sendMessage to prevent updateApps messages
+                    const originalSendMessage = chrome.runtime.sendMessage;
+                    chrome.runtime.sendMessage = function(message, callback) {
+                        if (message && message.action === 'updateApps') {
+                            console.warn('[DEBUG] Intercepted updateApps message, preventing it from being sent');
+                            if (callback) {
+                                setTimeout(() => {
+                                    callback({ success: true, intercepted: true });
+                                }, 0);
+                            }
+                            return;
+                        }
+                        return originalSendMessage.apply(chrome.runtime, arguments);
+                    };
 
                     try {
                         // 1. Get the new order based on the current DOM structure
@@ -970,21 +985,46 @@ class QuickTap {
                         }
 
                         // 4. Save the new order to storage via background script
-                        chrome.runtime.sendMessage({ action: 'updateApps', apps: newAppsOrder }, (response) => {
-                            if (chrome.runtime.lastError) {
-                                console.error('Error sending updateApps message after drop:', chrome.runtime.lastError.message || chrome.runtime.lastError);
-                                // Data index was updated optimistically. If save fails,
-                                // the next storage change or manual refresh should correct it.
-                            } else {
-                                // console.log('App order update sent successfully.');
-                                // DOM indices already updated optimistically above.
-                            }
-                            // Drag state (isDragging, .dragging class) is reset in the 'dragend' listener
-                        });
+                        console.log('[DEBUG] Using direct storage method for saving app order');
+                        console.trace('Call stack for saving app order');
+                        try {
+                            // 直接使用本地存储而不是通过background.js
+                            await new Promise((resolve, reject) => {
+                                chrome.storage.local.set({ apps: newAppsOrder }, () => {
+                                    if (chrome.runtime.lastError) {
+                                        console.error('Error saving apps after drop:', chrome.runtime.lastError);
+                                        reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
+                                    } else {
+                                        console.log('App order saved successfully after drop');
+                                        resolve();
+                                    }
+                                });
+                            });
+
+                            // 测试代码，看看是否还有其他地方在发送updateApps消息
+                            console.log('[DEBUG] Successfully saved app order directly, checking if there are other updateApps calls');
+
+                            // 添加一个小延迟，等待可能的其他调用
+                            setTimeout(() => {
+                                console.log('[DEBUG] Delayed check complete');
+                            }, 500);
+
+                        } catch (storageError) {
+                            console.error('Error saving app order to storage:', storageError);
+                            // Data index was updated optimistically. If save fails,
+                            // the next storage change or manual refresh should correct it.
+                        }
+                        // Drag state (isDragging, .dragging class) is reset in the 'dragend' listener
 
                     } catch (error) {
                         console.error('Error processing drop event:', error);
                         // Attempt to restore consistency? Or rely on dragend cleanup.
+                    } finally {
+                        // 恢复原始的chrome.runtime.sendMessage函数
+                        setTimeout(() => {
+                            chrome.runtime.sendMessage = originalSendMessage;
+                            console.log('[DEBUG] Restored original chrome.runtime.sendMessage');
+                        }, 1000); // 给其他可能的调用一些时间
                     }
                     // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
                 });
@@ -1989,25 +2029,25 @@ class QuickTap {
 (function() {
     try {
         // 检查是否已经创建了实例
-        if (window.quickTap && window.quickTap instanceof QuickTap) {
-            console.log('QuickTap already initialized, reusing existing instance');
+        if (window.sideDock && window.sideDock instanceof SideDock) {
+            console.log('SideDock already initialized, reusing existing instance');
 
             // 如果实例已存在，不需要重新加载应用列表
             // 因为实例已经在初始化时加载了应用列表
-            console.log('Using existing QuickTap instance, no need to reload apps');
+            console.log('Using existing SideDock instance, no need to reload apps');
         } else {
-            console.log('Creating new QuickTap instance...');
+            console.log('Creating new SideDock instance...');
             // 创建新实例
-            const quickTap = new QuickTap();
+            const sideDock = new SideDock();
 
             // 确保实例正确创建
-            if (!window.quickTap) {
-                console.warn('QuickTap instance not set in window object, setting it manually');
-                window.quickTap = quickTap;
+            if (!window.sideDock) {
+                console.warn('SideDock instance not set in window object, setting it manually');
+                window.sideDock = sideDock;
             }
         }
     } catch (error) {
-        console.error('Error initializing QuickTap:', error);
+        console.error('Error initializing SideDock:', error);
     }
 })()
 
@@ -2017,29 +2057,29 @@ try {
         // Handle extension messages
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
-                // 检查请求和quickTap实例是否存在
-                if (!request || !window.quickTap) {
+                // 检查请求和sideDock实例是否存在
+                if (!request || !window.sideDock) {
                     return;
                 }
 
                 // 处理切换侧边栏显示状态的请求
                 if (request.action === 'toggle') {
                     console.log('[QuickTap Debug] Received toggle message from extension');
-                    window.quickTap.togglePopup();
+                    window.sideDock.togglePopup();
                 } else
                 if (request.action === 'updateShortcut' && request.shortcut) {
                     // 处理快捷键更新消息
                     console.log('[QuickTap Debug] Received shortcut update:', JSON.stringify(request.shortcut));
-                    window.quickTap.shortcut = request.shortcut;
+                    window.sideDock.shortcut = request.shortcut;
                     console.log('[QuickTap Debug] Shortcut updated to:',
-                                'Key:', window.quickTap.shortcut.key,
-                                'Ctrl:', window.quickTap.shortcut.ctrl,
-                                'Alt:', window.quickTap.shortcut.alt,
-                                'Shift:', window.quickTap.shortcut.shift,
-                                'Command:', window.quickTap.shortcut.command);
+                                'Key:', window.sideDock.shortcut.key,
+                                'Ctrl:', window.sideDock.shortcut.ctrl,
+                                'Alt:', window.sideDock.shortcut.alt,
+                                'Shift:', window.sideDock.shortcut.shift,
+                                'Command:', window.sideDock.shortcut.command);
                 } else if (request.action === 'tabsChanged') {
                     // 标签页变化时更新图标状态
-                    window.quickTap.updateActiveStatus();
+                    window.sideDock.updateActiveStatus();
                 }
             } catch (error) {
                 console.error('Error handling extension message:', error);

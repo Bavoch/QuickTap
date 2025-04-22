@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "QuickTap",
+  "name": "SideDock",
   "version": "1.0",
   "description": "浏览器的 Dock 栏",
   "permissions": [
