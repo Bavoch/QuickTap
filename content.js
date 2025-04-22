@@ -16,7 +16,11 @@ class SideDock {
         this.appList = null;
         this.contextMenu = null;
         this.editModal = null;
+        this.groupPopup = null; // 分组弹窗
+        this.childContextMenu = null; // 子应用上下文菜单
         this.currentAppIndex = null;
+        this.currentGroupIndex = null; // 当前分组索引
+        this.currentChildIndex = null; // 当前子应用索引
         this.shortcut = { key: 'z', ctrl: false, alt: false, shift: false, command: false };
         this.loadingSpinner = null;
         this.isInitialized = false; // 添加初始化标志
@@ -361,12 +365,17 @@ class SideDock {
             const isContextMenuVisible = contextMenu.style.display === 'block';
             const isIconContextMenuVisible = iconContextMenu && iconContextMenu.style.display === 'block';
             const isEditModalVisible = this.editModal.style.display === 'block';
+            const isGroupPopupVisible = this.groupPopup !== null;
+            const isChildContextMenuVisible = this.childContextMenu && this.childContextMenu.style.display === 'block';
 
             // 如果点击的是右键菜单区域，不做任何处理
             if (contextMenu.contains(e.target) ||
                 (iconContextMenu && iconContextMenu.contains(e.target)) ||
+                (this.groupPopup && this.groupPopup.contains(e.target)) ||
+                (this.childContextMenu && this.childContextMenu.contains(e.target)) ||
                 e.target.closest('.app-icon') ||
-                e.target.closest('.edit-app-icon')) {
+                e.target.closest('.edit-app-icon') ||
+                e.target.closest('.popup-app-icon')) {
                 return;
             }
 
@@ -376,6 +385,20 @@ class SideDock {
                 if (iconContextMenu) {
                     iconContextMenu.style.display = 'none';
                 }
+                e.stopPropagation();
+                return;
+            }
+
+            // 如果子应用上下文菜单显示，则关闭它
+            if (isChildContextMenuVisible) {
+                this.hideChildContextMenu();
+                e.stopPropagation();
+                return;
+            }
+
+            // 如果分组弹窗显示，则关闭它
+            if (isGroupPopupVisible) {
+                this.hideGroupPopup();
                 e.stopPropagation();
                 return;
             }
@@ -621,6 +644,11 @@ class SideDock {
             if (!this.contextMenu.contains(e.target) && !e.target.closest('.app-icon')) {
                 this.hideContextMenu();
             }
+
+            // 关闭子应用上下文菜单
+            if (this.childContextMenu && !this.childContextMenu.contains(e.target)) {
+                this.hideChildContextMenu();
+            }
         });
 
         // Load saved apps
@@ -648,38 +676,101 @@ class SideDock {
         container.dataset.url = app.url;
         container.draggable = true; // 启用拖拽
 
-        const img = document.createElement('img');
-        img.alt = app.title;
-        img.addEventListener('error', () => this.handleImageError(img, app.title, index));
-        img.src = app.favicon;
+        // 如果是分组，添加分组标识
+        if (app.isGroup) {
+            container.dataset.isGroup = 'true';
+            container.classList.add('app-group');
+            // 如果分组是折叠状态
+            if (app.collapsed !== false) {
+                container.classList.add('collapsed');
+            }
+
+            // 创建分组网格布局
+            const groupGrid = document.createElement('div');
+            groupGrid.className = 'group-grid';
+
+            // 添加子应用图标到网格中
+            if (app.children && app.children.length > 0) {
+                // 最多显示4个应用
+                const maxItems = 4;
+                for (let i = 0; i < maxItems; i++) {
+                    const gridItem = document.createElement('div');
+                    gridItem.className = 'group-grid-item';
+
+                    if (i < app.children.length) {
+                        // 有子应用，显示子应用图标
+                        const childImg = document.createElement('img');
+                        childImg.src = app.children[i].favicon;
+                        childImg.alt = app.children[i].title;
+                        childImg.addEventListener('error', () => {
+                            // 如果图标加载失败，使用默认图标
+                            childImg.src = this.generateDefaultIcon(app.children[i].title);
+                        });
+                        gridItem.appendChild(childImg);
+                    } else {
+                        // 没有子应用，显示空位置
+                        gridItem.classList.add('empty');
+                    }
+
+                    groupGrid.appendChild(gridItem);
+                }
+            } else {
+                // 没有子应用，显示4个空位置
+                for (let i = 0; i < 4; i++) {
+                    const gridItem = document.createElement('div');
+                    gridItem.className = 'group-grid-item empty';
+                    groupGrid.appendChild(gridItem);
+                }
+            }
+
+            container.appendChild(groupGrid);
+        } else {
+            // 普通应用图标
+            const img = document.createElement('img');
+            img.alt = app.title;
+            img.addEventListener('error', () => this.handleImageError(img, app.title, index));
+            img.src = app.favicon;
+            container.appendChild(img);
+        }
 
         const indicator = document.createElement('div');
         indicator.className = 'active-indicator';
         container.style.position = 'relative';
-        container.appendChild(img);
         container.appendChild(indicator);
+
+        // 如果是分组，添加分组指示器
+        if (app.isGroup) {
+            const groupIndicator = document.createElement('div');
+            groupIndicator.className = 'group-indicator';
+            container.appendChild(groupIndicator);
+        }
 
         // 右键菜单
         container.addEventListener('contextmenu', (e) => {
             this.showContextMenu(e, index);
         });
-        // 点击跳转
+
+        // 添加点击事件
         container.addEventListener('click', (e) => {
-            if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-                window.open(app.url, '_blank');
+            // 如果是分组，则展开/折叠
+            if (app.isGroup) {
+                e.preventDefault(); // 阻止默认的链接跳转行为
+                this.toggleGroup(index);
+            } else {
+                // 如果是普通应用，则打开链接
                 e.preventDefault();
-                return;
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: app.url }, () => {
+                        if (chrome.runtime.lastError) {
+                            window.open(app.url, '_blank');
+                        }
+                    });
+                } else {
+                    window.open(app.url, '_blank');
+                }
             }
-            try {
-                chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: app.url }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        window.open(app.url, '_blank');
-                        return;
-                    }
-                });
-            } catch { window.open(app.url, '_blank'); }
-            e.preventDefault();
         });
+
         return container;
     }
 
@@ -903,7 +994,7 @@ class SideDock {
                     }
                 });
 
-                // {{edit 1: Replace drop listener logic}}
+                // 修改后的drop监听器，支持分组功能
                 appIcon.addEventListener('drop', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -918,111 +1009,165 @@ class SideDock {
 
                     console.log('[DEBUG] Drop event triggered');
 
-                    // Monkey patch chrome.runtime.sendMessage to prevent updateApps messages
-                    const originalSendMessage = chrome.runtime.sendMessage;
-                    chrome.runtime.sendMessage = function(message, callback) {
-                        if (message && message.action === 'updateApps') {
-                            console.warn('[DEBUG] Intercepted updateApps message, preventing it from being sent');
-                            if (callback) {
-                                setTimeout(() => {
-                                    callback({ success: true, intercepted: true });
-                                }, 0);
-                            }
-                            return;
-                        }
-                        return originalSendMessage.apply(chrome.runtime, arguments);
-                    };
+                    // 获取拖拽元素和目标元素的索引
+                    const draggedIndex = parseInt(draggedElement.dataset.index);
+                    const targetIndex = parseInt(appIcon.dataset.index);
 
-                    try {
-                        // 1. Get the new order based on the current DOM structure
-                        const finalAppIcons = Array.from(this.domElements.appList.querySelectorAll('.app-icon'));
-                        const originalApps = await this.getApps(); // Get original data array
+                    // 如果拖拽到自己身上，不做任何处理
+                    if (draggedIndex === targetIndex) {
+                        return;
+                    }
 
-                         // Check if elements exist before proceeding
-                         if (!finalAppIcons.length || !originalApps.length) {
-                            console.error('Could not get final icons or original apps data during drop.');
-                            return;
-                         }
+                    // 检查是否拖拽到分组上或者是否需要创建新分组
+                    const isTargetGroup = appIcon.dataset.isGroup === 'true';
+                    const isDraggedGroup = draggedElement.dataset.isGroup === 'true';
 
-                        // Create a map of URL -> app data for efficient lookup
-                        const appDataMap = new Map();
-                        originalApps.forEach(app => {
-                            if (app && app.url) {
-                                appDataMap.set(app.url, app);
-                            } else {
-                                console.warn('Found app with missing URL in originalApps during drop mapping');
-                            }
-                        });
+                    // 获取原始应用数据
+                    const originalApps = await this.getApps();
+                    let newApps = [...originalApps]; // 创建副本以进行修改
 
-                        const newAppsOrder = [];
-                        let dataConsistent = true;
+                    // 如果拖拽到分组上，将应用添加到分组中
+                    if (isTargetGroup && !isDraggedGroup) {
+                        console.log(`[DEBUG] Adding app at index ${draggedIndex} to group at index ${targetIndex}`);
 
-                        // 2. Rebuild the apps array and update data-index attributes immediately
-                        finalAppIcons.forEach((icon, index) => {
-                            const url = icon.dataset.url;
-                            if (appDataMap.has(url)) {
-                                newAppsOrder.push(appDataMap.get(url));
-                                // Update data-index immediately to match new DOM order
-                                icon.dataset.index = index.toString();
-                            } else {
-                                console.error(`Data inconsistency: Could not find app data for URL: ${url} at DOM index ${index} during reorder.`);
-                                dataConsistent = false;
-                                // Potentially push a placeholder or skip? Skipping loses data.
-                                // For now, log error and mark as inconsistent.
-                            }
-                        });
+                        // 获取拖拽的应用和目标分组
+                        const draggedApp = {...newApps[draggedIndex]};
+                        const targetGroup = newApps[targetIndex];
 
-                        // 3. Check for consistency before saving
-                        if (!dataConsistent || newAppsOrder.length !== originalApps.length) {
-                            console.error("App order inconsistency detected! Aborting save. Triggering recovery reload.",
-                                          "Original Count:", originalApps.length, "New Count:", newAppsOrder.length);
-                            // Optional: Trigger a full reload to try and recover state
-                            // Be cautious with this to avoid loops if the error persists.
-                            // await this.loadApps(); // Consider if safe
-                            return; // Prevent saving inconsistent data
+                        // 确保目标分组有children数组
+                        if (!targetGroup.children) {
+                            targetGroup.children = [];
                         }
 
-                        // 4. Save the new order to storage via background script
-                        console.log('[DEBUG] Using direct storage method for saving app order');
-                        console.trace('Call stack for saving app order');
+                        // 将拖拽的应用添加到分组中
+                        targetGroup.children.push(draggedApp);
+
+                        // 从原位置删除拖拽的应用
+                        newApps.splice(draggedIndex, 1);
+
+                        // 更新索引
+                        if (draggedIndex < targetIndex) {
+                            // 如果拖拽的应用在分组前面，需要调整分组的索引
+                            newApps[targetIndex - 1] = targetGroup;
+                        } else {
+                            newApps[targetIndex] = targetGroup;
+                        }
+                    }
+                    // 如果拖拽到普通应用上，创建新分组
+                    else if (!isTargetGroup && !isDraggedGroup) {
+                        console.log(`[DEBUG] Creating new group with apps at indices ${targetIndex} and ${draggedIndex}`);
+
+                        // 获取拖拽的应用和目标应用
+                        const draggedApp = {...newApps[draggedIndex]};
+                        const targetApp = {...newApps[targetIndex]};
+
+                        // 创建新分组
+                        const newGroup = {
+                            title: `分组 ${targetApp.title}`,
+                            url: targetApp.url, // 使用目标应用的URL作为分组URL
+                            favicon: targetApp.favicon, // 使用目标应用的图标作为分组图标
+                            isGroup: true,
+                            collapsed: false, // 默认展开
+                            children: [targetApp, draggedApp] // 添加目标应用和拖拽的应用到分组中
+                        };
+
+                        // 确定需要删除的索引
+                        const indicesToRemove = [draggedIndex, targetIndex].sort((a, b) => b - a);
+
+                        // 从原位置删除应用（从大索引开始删除，避免索引变化）
+                        indicesToRemove.forEach(index => {
+                            newApps.splice(index, 1);
+                        });
+
+                        // 在目标位置插入新分组
+                        const insertIndex = Math.min(draggedIndex, targetIndex);
+                        newApps.splice(insertIndex, 0, newGroup);
+                    }
+                    // 如果是普通的拖拽排序
+                    else {
+                        // Monkey patch chrome.runtime.sendMessage to prevent updateApps messages
+                        const originalSendMessage = chrome.runtime.sendMessage;
+                        chrome.runtime.sendMessage = function(message, callback) {
+                            if (message && message.action === 'updateApps') {
+                                console.warn('[DEBUG] Intercepted updateApps message, preventing it from being sent');
+                                if (callback) {
+                                    setTimeout(() => {
+                                        callback({ success: true, intercepted: true });
+                                    }, 0);
+                                }
+                                return;
+                            }
+                            return originalSendMessage.apply(chrome.runtime, arguments);
+                        };
+
                         try {
-                            // 直接使用本地存储而不是通过background.js
-                            await new Promise((resolve, reject) => {
-                                chrome.storage.local.set({ apps: newAppsOrder }, () => {
-                                    if (chrome.runtime.lastError) {
-                                        console.error('Error saving apps after drop:', chrome.runtime.lastError);
-                                        reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
-                                    } else {
-                                        console.log('App order saved successfully after drop');
-                                        resolve();
-                                    }
-                                });
+                            // 1. Get the new order based on the current DOM structure
+                            const finalAppIcons = Array.from(this.domElements.appList.querySelectorAll('.app-icon'));
+
+                            // Check if elements exist before proceeding
+                            if (!finalAppIcons.length || !originalApps.length) {
+                                console.error('Could not get final icons or original apps data during drop.');
+                                return;
+                            }
+
+                            // Create a map of URL -> app data for efficient lookup
+                            const appDataMap = new Map();
+                            originalApps.forEach(app => {
+                                if (app && app.url) {
+                                    appDataMap.set(app.url, app);
+                                } else {
+                                    console.warn('Found app with missing URL in originalApps during drop mapping');
+                                }
                             });
 
-                            // 测试代码，看看是否还有其他地方在发送updateApps消息
-                            console.log('[DEBUG] Successfully saved app order directly, checking if there are other updateApps calls');
+                            newApps = [];
+                            let dataConsistent = true;
 
-                            // 添加一个小延迟，等待可能的其他调用
+                            // 2. Rebuild the apps array and update data-index attributes immediately
+                            finalAppIcons.forEach((icon, index) => {
+                                const url = icon.dataset.url;
+                                if (appDataMap.has(url)) {
+                                    newApps.push(appDataMap.get(url));
+                                    // Update data-index immediately to match new DOM order
+                                    icon.dataset.index = index.toString();
+                                } else {
+                                    console.error(`Data inconsistency: Could not find app data for URL: ${url} at DOM index ${index} during reorder.`);
+                                    dataConsistent = false;
+                                }
+                            });
+
+                            // 3. Check for consistency before saving
+                            if (!dataConsistent || newApps.length !== originalApps.length) {
+                                console.error("App order inconsistency detected! Aborting save.",
+                                            "Original Count:", originalApps.length, "New Count:", newApps.length);
+                                return; // Prevent saving inconsistent data
+                            }
+                        } catch (error) {
+                            console.error('Error processing drop event:', error);
+                        } finally {
+                            // 恢复原始的chrome.runtime.sendMessage函数
                             setTimeout(() => {
-                                console.log('[DEBUG] Delayed check complete');
-                            }, 500);
-
-                        } catch (storageError) {
-                            console.error('Error saving app order to storage:', storageError);
-                            // Data index was updated optimistically. If save fails,
-                            // the next storage change or manual refresh should correct it.
+                                chrome.runtime.sendMessage = originalSendMessage;
+                                console.log('[DEBUG] Restored original chrome.runtime.sendMessage');
+                            }, 1000);
                         }
-                        // Drag state (isDragging, .dragging class) is reset in the 'dragend' listener
+                    }
 
-                    } catch (error) {
-                        console.error('Error processing drop event:', error);
-                        // Attempt to restore consistency? Or rely on dragend cleanup.
-                    } finally {
-                        // 恢复原始的chrome.runtime.sendMessage函数
-                        setTimeout(() => {
-                            chrome.runtime.sendMessage = originalSendMessage;
-                            console.log('[DEBUG] Restored original chrome.runtime.sendMessage');
-                        }, 1000); // 给其他可能的调用一些时间
+                    // 保存更新后的应用列表
+                    try {
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.local.set({ apps: newApps }, () => {
+                                if (chrome.runtime.lastError) {
+                                    console.error('Error saving apps after drop:', chrome.runtime.lastError);
+                                    reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
+                                } else {
+                                    console.log('Apps saved successfully after drop');
+                                    resolve();
+                                }
+                            });
+                        });
+                    } catch (storageError) {
+                        console.error('Error saving app order to storage:', storageError);
                     }
                     // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
                 });
@@ -1187,10 +1332,401 @@ class SideDock {
     showContextMenu(e, index) {
         e.preventDefault();
         const rect = e.target.getBoundingClientRect();
+
+        // 检查是否是分组
+        const isGroup = e.target.closest('.app-icon')?.dataset.isGroup === 'true';
+
+        // 如果是分组，显示分组特有的菜单项
+        if (isGroup) {
+            // 确保分组菜单项存在
+            if (!this.contextMenu.querySelector('.ungroup')) {
+                const ungroupItem = document.createElement('div');
+                ungroupItem.className = 'context-menu-item ungroup';
+                ungroupItem.innerHTML = '<span>解散分组</span>';
+                ungroupItem.addEventListener('click', () => this.handleUngroup());
+                this.contextMenu.appendChild(ungroupItem);
+            }
+
+            // 显示解散分组选项
+            const ungroupItem = this.contextMenu.querySelector('.ungroup');
+            if (ungroupItem) ungroupItem.style.display = 'flex';
+        } else {
+            // 隐藏解散分组选项
+            const ungroupItem = this.contextMenu.querySelector('.ungroup');
+            if (ungroupItem) ungroupItem.style.display = 'none';
+        }
+
         this.contextMenu.style.display = 'block';
         this.contextMenu.style.left = `${rect.right + 8}px`;
         this.contextMenu.style.top = `${rect.top}px`;
         this.currentAppIndex = index;
+    }
+
+    // 切换分组的展开/折叠状态
+    async toggleGroup(index) {
+        try {
+            const apps = await this.getApps();
+            const app = apps[index];
+
+            // 确保是分组
+            if (!app || !app.isGroup) {
+                console.warn('Attempted to toggle a non-group app');
+                return;
+            }
+
+            // 获取分组图标
+            const groupIcon = this.popup.querySelector(`.app-icon[data-index="${index}"]`);
+            if (!groupIcon) return;
+
+            // 显示分组弹窗
+            if (app.children && app.children.length > 0) {
+                this.showGroupPopup(groupIcon, app.children);
+            }
+
+        } catch (error) {
+            console.error('Error toggling group:', error);
+        }
+    }
+
+    // 显示分组弹窗
+    showGroupPopup(groupIcon, children) {
+        // 隐藏已存在的弹窗
+        this.hideGroupPopup();
+
+        // 获取分组图标的位置
+        const rect = groupIcon.getBoundingClientRect();
+
+        // 创建弹窗
+        const popup = document.createElement('div');
+        popup.className = 'group-popup sidedock-extension';
+
+        // 添加子应用图标
+        children.forEach((child, i) => {
+            const appIcon = document.createElement('div');
+            appIcon.className = 'popup-app-icon';
+            appIcon.title = child.title;
+            appIcon.dataset.url = child.url;
+
+            const img = document.createElement('img');
+            img.alt = child.title;
+            img.src = child.favicon;
+            img.addEventListener('error', () => {
+                // 如果图标加载失败，使用默认图标
+                img.src = this.generateDefaultIcon(child.title);
+            });
+
+            appIcon.appendChild(img);
+
+            // 添加点击事件
+            appIcon.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: child.url }, () => {
+                        if (chrome.runtime.lastError) {
+                            window.open(child.url, '_blank');
+                        }
+                    });
+                } else {
+                    window.open(child.url, '_blank');
+                }
+                this.hideGroupPopup();
+            });
+
+            popup.appendChild(appIcon);
+        });
+
+        // 计算弹窗位置，与分组图标垂直居中对齐，间距12px
+        const popupLeft = rect.right + 12; // 分组图标右侧 + 12px间距
+        const popupTop = rect.top + (rect.height / 2) - 80; // 垂直居中（假设弹窗高度为160px）
+
+        // 设置弹窗位置
+        popup.style.left = `${popupLeft}px`;
+        popup.style.top = `${popupTop}px`;
+
+        // 添加到文档
+        document.body.appendChild(popup);
+
+        // 保存弹窗引用
+        this.groupPopup = popup;
+
+        // 添加点击外部关闭弹窗的事件
+        setTimeout(() => {
+            document.addEventListener('click', this.handleDocumentClick);
+        }, 0);
+    }
+
+    // 隐藏分组弹窗
+    hideGroupPopup() {
+        if (this.groupPopup) {
+            this.groupPopup.remove();
+            this.groupPopup = null;
+
+            // 移除文档点击事件
+            document.removeEventListener('click', this.handleDocumentClick);
+        }
+    }
+
+    // 处理文档点击事件
+    handleDocumentClick = (e) => {
+        // 如果点击的不是弹窗或其子元素，则关闭弹窗
+        if (this.groupPopup && !this.groupPopup.contains(e.target) && !e.target.closest('.app-icon.app-group')) {
+            this.hideGroupPopup();
+        }
+    }
+
+    // 更新分组图标的网格显示
+    updateGroupGrid(index, app) {
+        const groupIcon = this.popup.querySelector(`.app-icon[data-index="${index}"]`);
+        if (!groupIcon) return;
+
+        // 移除旧的网格
+        const oldGrid = groupIcon.querySelector('.group-grid');
+        if (oldGrid) {
+            oldGrid.remove();
+        }
+
+        // 创建新的网格
+        const groupGrid = document.createElement('div');
+        groupGrid.className = 'group-grid';
+
+        // 添加子应用图标到网格中
+        if (app.children && app.children.length > 0) {
+            // 最多显示4个应用
+            const maxItems = 4;
+            for (let i = 0; i < maxItems; i++) {
+                const gridItem = document.createElement('div');
+                gridItem.className = 'group-grid-item';
+
+                if (i < app.children.length) {
+                    // 有子应用，显示子应用图标
+                    const childImg = document.createElement('img');
+                    childImg.src = app.children[i].favicon;
+                    childImg.alt = app.children[i].title;
+                    childImg.addEventListener('error', () => {
+                        // 如果图标加载失败，使用默认图标
+                        childImg.src = this.generateDefaultIcon(app.children[i].title);
+                    });
+                    gridItem.appendChild(childImg);
+                } else {
+                    // 没有子应用，显示空位置
+                    gridItem.classList.add('empty');
+                }
+
+                groupGrid.appendChild(gridItem);
+            }
+        } else {
+            // 没有子应用，显示4个空位置
+            for (let i = 0; i < 4; i++) {
+                const gridItem = document.createElement('div');
+                gridItem.className = 'group-grid-item empty';
+                groupGrid.appendChild(gridItem);
+            }
+        }
+
+        // 添加到分组图标
+        groupIcon.appendChild(groupGrid);
+    }
+
+    // 渲染分组的子应用
+    renderGroupChildren(groupIndex, children) {
+        // 先移除可能已存在的子应用
+        this.hideGroupChildren(groupIndex);
+
+        // 获取分组图标
+        const groupIcon = this.popup.querySelector(`.app-icon[data-index="${groupIndex}"]`);
+        if (!groupIcon) return;
+
+        // 创建子应用容器
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'group-children';
+        childrenContainer.dataset.parentIndex = groupIndex;
+
+        // 添加子应用
+        children.forEach((child, i) => {
+            const childIcon = document.createElement('a');
+            childIcon.href = child.url;
+            childIcon.className = 'app-icon child-icon';
+            childIcon.title = child.title;
+            childIcon.dataset.url = child.url;
+            childIcon.dataset.childIndex = i;
+
+            const img = document.createElement('img');
+            img.alt = child.title;
+            img.src = child.favicon;
+            img.addEventListener('error', () => this.handleImageError(img, child.title));
+
+            childIcon.appendChild(img);
+
+            // 添加点击事件
+            childIcon.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: child.url }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            window.open(child.url, '_blank');
+                        }
+                    });
+                } else {
+                    window.open(child.url, '_blank');
+                }
+            });
+
+            // 添加右键菜单
+            childIcon.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showChildContextMenu(e, groupIndex, i);
+            });
+
+            childrenContainer.appendChild(childIcon);
+        });
+
+        // 插入到分组图标后面
+        groupIcon.parentNode.insertBefore(childrenContainer, groupIcon.nextSibling);
+    }
+
+    // 隐藏分组的子应用
+    hideGroupChildren(groupIndex) {
+        const childrenContainer = this.popup.querySelector(`.group-children[data-parent-index="${groupIndex}"]`);
+        if (childrenContainer) {
+            childrenContainer.remove();
+        }
+    }
+
+    // 显示子应用的上下文菜单
+    showChildContextMenu(e, groupIndex, childIndex) {
+        e.preventDefault();
+        const rect = e.target.getBoundingClientRect();
+
+        // 确保子应用上下文菜单存在
+        if (!this.childContextMenu) {
+            this.childContextMenu = document.createElement('div');
+            this.childContextMenu.className = 'context-menu child-context-menu sidedock-extension';
+            this.childContextMenu.innerHTML = `
+                <div class="context-menu-item remove-from-group">
+                    <span>从分组中移除</span>
+                </div>
+            `;
+            document.body.appendChild(this.childContextMenu);
+
+            // 添加移除事件
+            this.childContextMenu.querySelector('.remove-from-group').addEventListener('click', () => {
+                this.removeFromGroup(this.currentGroupIndex, this.currentChildIndex);
+                this.hideChildContextMenu();
+            });
+        }
+
+        this.currentGroupIndex = groupIndex;
+        this.currentChildIndex = childIndex;
+
+        this.childContextMenu.style.display = 'block';
+        this.childContextMenu.style.left = `${rect.right + 8}px`;
+        this.childContextMenu.style.top = `${rect.top}px`;
+    }
+
+    // 隐藏子应用上下文菜单
+    hideChildContextMenu() {
+        if (this.childContextMenu) {
+            this.childContextMenu.style.display = 'none';
+        }
+    }
+
+    // 从分组中移除应用
+    async removeFromGroup(groupIndex, childIndex) {
+        try {
+            const apps = await this.getApps();
+            const group = apps[groupIndex];
+
+            // 确保是分组且有子应用
+            if (!group || !group.isGroup || !group.children || childIndex >= group.children.length) {
+                console.warn('Invalid group or child index');
+                return;
+            }
+
+            // 获取要移除的子应用
+            const child = {...group.children[childIndex]};
+
+            // 从分组中移除
+            group.children.splice(childIndex, 1);
+
+            // 如果分组为空，移除分组标记
+            if (group.children.length === 0) {
+                delete group.children;
+                delete group.isGroup;
+                delete group.collapsed;
+            } else {
+                // 如果分组不为空，更新分组图标
+                this.updateGroupGrid(groupIndex, group);
+            }
+
+            // 将移除的应用添加到主列表
+            apps.splice(groupIndex + 1, 0, child);
+
+            // 保存更改
+            await new Promise((resolve, reject) => {
+                chrome.storage.local.set({ apps }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error removing from group:', chrome.runtime.lastError);
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        console.log('App removed from group successfully');
+                        resolve();
+                    }
+                });
+            });
+
+            // 重新加载应用列表
+            this.loadApps();
+
+        } catch (error) {
+            console.error('Error removing from group:', error);
+        }
+    }
+
+    // 解散分组
+    async handleUngroup() {
+        try {
+            const apps = await this.getApps();
+            const group = apps[this.currentAppIndex];
+
+            // 确保是分组且有子应用
+            if (!group || !group.isGroup || !group.children || group.children.length === 0) {
+                console.warn('Invalid group or no children');
+                this.hideContextMenu();
+                return;
+            }
+
+            // 获取子应用
+            const children = [...group.children];
+
+            // 从列表中移除分组
+            apps.splice(this.currentAppIndex, 1);
+
+            // 将子应用添加到原分组位置
+            apps.splice(this.currentAppIndex, 0, ...children);
+
+            // 保存更改
+            await new Promise((resolve, reject) => {
+                chrome.storage.local.set({ apps }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error ungrouping:', chrome.runtime.lastError);
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        console.log('Group disbanded successfully');
+                        resolve();
+                    }
+                });
+            });
+
+            // 隐藏上下文菜单
+            this.hideContextMenu();
+
+            // 重新加载应用列表
+            this.loadApps();
+
+        } catch (error) {
+            console.error('Error ungrouping:', error);
+            this.hideContextMenu();
+        }
     }
 
     hideContextMenu() {
@@ -1699,10 +2235,33 @@ class SideDock {
             appIcons.forEach(icon => {
                 try {
                     const appUrl = icon.dataset.url;
-                    if (this.isAppOpen(appUrl, openTabs)) {
-                        icon.classList.add('active');
+                    const isGroup = icon.dataset.isGroup === 'true';
+
+                    if (isGroup) {
+                        // 如果是分组，检查其子应用是否有活跃的
+                        const apps = this.getApps();
+                        const index = parseInt(icon.dataset.index);
+                        const groupApp = apps[index];
+
+                        if (groupApp && groupApp.children && groupApp.children.length > 0) {
+                            const hasActiveChild = groupApp.children.some(child =>
+                                this.isAppOpen(child.url, openTabs));
+
+                            if (hasActiveChild) {
+                                icon.classList.add('active');
+                            } else {
+                                icon.classList.remove('active');
+                            }
+                        } else {
+                            icon.classList.remove('active');
+                        }
                     } else {
-                        icon.classList.remove('active');
+                        // 普通应用图标
+                        if (this.isAppOpen(appUrl, openTabs)) {
+                            icon.classList.add('active');
+                        } else {
+                            icon.classList.remove('active');
+                        }
                     }
                 } catch (error) {
                     console.error('Error updating icon status:', error);

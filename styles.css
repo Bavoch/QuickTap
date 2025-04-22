@@ -180,6 +180,151 @@
     animation: duplicate-pulse 0.8s ease-in-out 3;
 }
 
+/* 分组相关样式 */
+.app-icon.app-group {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.25);
+    overflow: visible;
+}
+
+/* 分组内的应用图标网格 */
+.app-icon.app-group .group-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    padding: 3px;
+}
+
+.app-icon.app-group .group-grid-item {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.25);
+}
+
+.app-icon.app-group .group-grid-item.empty {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+}
+
+.app-icon.app-group .group-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.app-icon.app-group .group-indicator {
+    position: absolute;
+    right: 2px;
+    top: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    transition: all 0.2s ease;
+}
+
+.app-icon.app-group.collapsed .group-indicator {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* 分组子应用容器 */
+.group-children {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-left: 24px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    padding-left: 12px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+/* 子应用图标 */
+.app-icon.child-icon {
+    width: 32px;
+    height: 32px;
+    opacity: 0.85;
+    transition: all 0.2s ease;
+}
+
+.app-icon.child-icon:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* 子应用上下文菜单 */
+.child-context-menu {
+    position: fixed;
+    width: 110px;
+    padding: 4px;
+    background: rgba(28, 28, 28, 0.95);
+    border-radius: 10px;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.60);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: 2147483647;
+}
+
+/* 分组弹窗 */
+.group-popup {
+    position: fixed;
+    width: 176px; /* w-44 = 176px */
+    max-height: 160px; /* max-h-40 = 160px */
+    padding: 12px; /* p-3 = 12px */
+    background: rgba(25, 25, 25, 0.7); /* bg-[#191919]/70 */
+    border-radius: 16px; /* rounded-2xl = 16px */
+    box-shadow: 0px 5px 50px 0px rgba(0, 0, 0, 0.30), 0px 2px 6px 0px rgba(0, 0, 0, 0.20);
+    outline: 1px solid white;
+    outline-offset: -1px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: inline-flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 8px; /* gap-2 = 8px */
+    flex-wrap: wrap;
+    content-visibility: auto;
+    overflow-y: auto;
+    z-index: 2147483647;
+}
+
+/* 分组弹窗中的应用图标 */
+.group-popup .popup-app-icon {
+    width: 32px; /* size-8 = 32px */
+    height: 32px;
+    position: relative;
+    border-radius: 8px; /* rounded-lg = 8px */
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.group-popup .popup-app-icon:hover {
+    transform: scale(1.05);
+}
+
+.group-popup .popup-app-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .add-app-btn {
     width: 40px;
     height: 40px;
