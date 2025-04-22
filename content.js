@@ -1437,7 +1437,7 @@ class SideDock {
 
         // 计算弹窗位置，与分组图标垂直居中对齐，间距12px
         const popupLeft = rect.right + 12; // 分组图标右侧 + 12px间距
-        const popupTop = rect.top + (rect.height / 2) - 80; // 垂直居中（假设弹窗高度为160px）
+        const popupTop = rect.top + (rect.height / 2) - 68; // 垂直居中（弹窗高度为136px）
 
         // 设置弹窗位置
         popup.style.left = `${popupLeft}px`;
@@ -1468,8 +1468,11 @@ class SideDock {
 
     // 处理文档点击事件
     handleDocumentClick = (e) => {
-        // 如果点击的不是弹窗或其子元素，则关闭弹窗
-        if (this.groupPopup && !this.groupPopup.contains(e.target) && !e.target.closest('.app-icon.app-group')) {
+        // 如果点击的不是弹窗或其子元素，也不是分组图标，则关闭弹窗
+        const isGroupIcon = e.target.closest('.app-icon.app-group');
+        const isPopupOrChild = this.groupPopup && this.groupPopup.contains(e.target);
+
+        if (this.groupPopup && !isPopupOrChild && !isGroupIcon) {
             this.hideGroupPopup();
         }
     }

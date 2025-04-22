@@ -283,13 +283,13 @@
 /* 分组弹窗 */
 .group-popup {
     position: fixed;
-    width: 176px; /* w-44 = 176px */
-    max-height: 160px; /* max-h-40 = 160px */
+    width: 176px; /* 固定宽度 */
+    height: 136px; /* 固定高度 */
     padding: 12px; /* p-3 = 12px */
     background: rgba(25, 25, 25, 0.7); /* bg-[#191919]/70 */
     border-radius: 16px; /* rounded-2xl = 16px */
     box-shadow: 0px 5px 50px 0px rgba(0, 0, 0, 0.30), 0px 2px 6px 0px rgba(0, 0, 0, 0.20);
-    outline: 1px solid white;
+    outline: 1px solid rgba(255, 255, 255, 0.1); /* 改为半透明边框 */
     outline-offset: -1px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -301,6 +301,7 @@
     content-visibility: auto;
     overflow-y: auto;
     z-index: 2147483647;
+    box-sizing: border-box; /* 确保包含内边距和边框 */
 }
 
 /* 分组弹窗中的应用图标 */
