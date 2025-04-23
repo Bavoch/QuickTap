@@ -2,13 +2,13 @@ class SideDock {
     constructor() {
         // 检查是否已经创建了实例
         if (window.sideDock) {
-            console.warn('SideDock instance already exists, returning existing instance');
+            // SideDock instance already exists, returning existing instance
             return window.sideDock;
         }
 
         // 将实例绑定到全局变量
         window.sideDock = this;
-        console.log('Creating new SideDock instance');
+        // Creating new SideDock instance
 
         // 基本属性
         this.popup = null;
@@ -60,10 +60,9 @@ class SideDock {
             try {
                 if (namespace === 'local' && changes && changes.apps) {
                    if (this.isDragging) {
-                       console.log('Storage changed during drag, skipping app reload');
                        return;
                    }
-                   console.log('Storage changed, scheduling app reload...');
+                   // Storage changed, scheduling app reload
 
                    // 清除之前的定时器
                     if (this.loadingTimeout) {
@@ -72,18 +71,18 @@ class SideDock {
 
                     // 如果已经在加载中，则不重复加载
                     if (this.isLoadingApps) {
-                        console.log('Apps already loading, skipping redundant load');
+                        // Apps already loading, skipping redundant load
                         return;
                     }
 
                     // 设置定时器，延迟加载以防止多次触发
                     this.loadingTimeout = setTimeout(() => {
-                        console.log('Executing delayed app reload');
+                        // Executing delayed app reload
                         this.loadApps();
                     }, 100); // 100ms 延迟，合并短时间内的多次变更
                 }
             } catch (error) {
-                console.error('Error in storage change handler:', error);
+                // Error in storage change handler
             }
         };
 
@@ -95,47 +94,47 @@ class SideDock {
 
                 // 添加新监听器
                 chrome.storage.onChanged.addListener(this.storageChangeHandler);
-                console.log('Storage change listener added');
+                // Storage change listener added
             } catch (error) {
-                console.error('Error setting up storage change listener:', error);
+                // Error setting up storage change listener
             }
         } else {
-            console.warn('Chrome storage API not available, storage change listener not added');
+            // Chrome storage API not available, storage change listener not added
         }
     }
 
     init() {
         // 检查是否已经初始化
         if (window.sideDockInstance) {
-            console.warn('SideDock already initialized, skipping initialization');
+            // SideDock already initialized, skipping initialization
             return window.sideDockInstance;
         }
 
-        console.log('Initializing SideDock...');
+        // Initializing SideDock...
 
         // 移除可能存在的旧元素
-        console.log('Removing existing SideDock elements...');
+        // Removing existing SideDock elements...
         const existingElements = document.querySelectorAll('.sidedock-extension');
-        console.log(`Found ${existingElements.length} existing elements to remove`);
+        // Found existing elements to remove
         existingElements.forEach(element => {
             try {
                 element.remove();
             } catch (error) {
-                console.error('Error removing element:', error);
+                // Error removing element
             }
         });
 
         // 再次检查是否有元素没有被清除
         const remainingElements = document.querySelectorAll('.sidedock-extension');
         if (remainingElements.length > 0) {
-            console.warn(`Still have ${remainingElements.length} sidedock elements after cleanup, forcing removal`);
+            // Still have remaining elements after cleanup, forcing removal
             remainingElements.forEach(element => {
                 try {
                     if (element.parentNode) {
                         element.parentNode.removeChild(element);
                     }
                 } catch (error) {
-                    console.error('Error force removing element:', error);
+                    // Error force removing element
                 }
             });
         }
@@ -165,24 +164,21 @@ class SideDock {
 
         // 添加触发区域的鼠标进入事件（立即触发，无延迟）
         this.triggerZone.addEventListener('mouseenter', () => {
-            console.log('[SideDock Debug] Mouse entered triggerZone'); // Add log
+            // Mouse entered triggerZone
             // 清除可能存在的闲置定时器
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[SideDock Debug] Cleared triggerIdleTimer on triggerZone mouseenter');
             }
             // 移除idle状态，确保指示条完全可见
             if (this.triggerZone) {
                 // 强制移除idle类，确保指示线完全可见
                 this.triggerZone.classList.remove('idle');
-                console.log('[SideDock Debug] Removed idle class from triggerZone on mouseenter. Classes:', this.triggerZone.classList.toString());
             }
 
             // 防抖动：检查距离上次显示的时间
             const now = Date.now();
             if (now - this.lastShowTime < 1000) { // 如果1秒内刚显示过，则不再触发
-                console.log('[SideDock Debug] Ignoring rapid re-entry, last show was', now - this.lastShowTime, 'ms ago');
                 return;
             }
 
@@ -194,42 +190,31 @@ class SideDock {
 
             // 立即显示侧边栏，不使用延迟
             if (!this.visible) {
-                console.log('[SideDock Debug] Sidebar not visible, calling show() from triggerZone mouseenter (immediate)');
                 this.show();
                 this.lastShowTime = Date.now(); // 记录显示时间
-            } else {
-                console.log('[SideDock Debug] Sidebar already visible, not calling show() from triggerZone mouseenter');
             }
         });
         this.triggerZone.addEventListener('mouseleave', () => {
-            console.log('[SideDock Debug] Mouse left triggerZone'); // Add log
+            // Mouse left triggerZone
 
             // 清除可能存在的显示定时器，防止离开后仍然触发显示
             if (this.showSidebarTimer) {
                 clearTimeout(this.showSidebarTimer);
                 this.showSidebarTimer = null;
-                console.log('[SideDock Debug] Cleared showSidebarTimer on triggerZone mouseleave');
             }
 
             // 鼠标离开触发区，如果侧边栏未显示，则启动闲置计时器
             if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
-                console.log('[SideDock Debug] Sidebar hidden and triggerZone visible, starting idle timer...');
                 if (this.triggerIdleTimer) {
                     clearTimeout(this.triggerIdleTimer);
                 }
                 this.triggerIdleTimer = setTimeout(() => {
-                    console.log('[SideDock Debug] Idle timer fired');
                     // 检查条件再次满足时才添加idle类
                     if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
                         this.triggerZone.classList.add('idle');
-                        console.log('[SideDock Debug] Added idle class to triggerZone. Classes:', this.triggerZone.classList.toString());
-                    } else {
-                        console.log('[SideDock Debug] Condition not met for adding idle class');
                     }
                     this.triggerIdleTimer = null; // 清除计时器引用
                 }, this.IDLE_DELAY); // 使用常量 IDLE_DELAY
-            } else {
-                console.log(`[SideDock Debug] Not starting idle timer (sidebar visible: ${this.visible})`);
             }
         });
 
@@ -243,21 +228,19 @@ class SideDock {
                         chrome.storage.sync.get(['shortcut'], (result) => {
                             try {
                                 if (chrome.runtime.lastError) {
-                                    console.warn('Error loading shortcut settings:', chrome.runtime.lastError);
+                                    // Error loading shortcut settings
                                     resolve(false);
                                     return;
                                 }
 
                                 if (result && result.shortcut) {
-                                    console.log('[SideDock Debug] Loaded shortcut settings:', JSON.stringify(result.shortcut));
                                     this.shortcut = result.shortcut;
                                     resolve(true);
                                 } else {
-                                    console.log('[SideDock Debug] No shortcut settings found, using default');
                                     resolve(false);
                                 }
                             } catch (error) {
-                                console.error('Error processing shortcut settings:', error);
+                                // Error processing shortcut settings
                                 resolve(false);
                             }
                         });
@@ -265,20 +248,12 @@ class SideDock {
                 };
 
                 // 立即执行加载
-                loadShortcut().then(success => {
-                    console.log('[SideDock Debug] Shortcut loading completed, success:', success);
-                    console.log('[SideDock Debug] Current shortcut setting:',
-                                'Key:', this.shortcut.key,
-                                'Ctrl:', this.shortcut.ctrl,
-                                'Alt:', this.shortcut.alt,
-                                'Shift:', this.shortcut.shift,
-                                'Command:', this.shortcut.command);
-                });
+                loadShortcut();
             } else {
-                console.warn('Chrome storage sync API not available, using default shortcut settings');
+                // Chrome storage sync API not available, using default shortcut settings
             }
         } catch (error) {
-            console.error('Error loading shortcut settings:', error);
+            // Error loading shortcut settings
         }
 
         // Create popup container
@@ -439,56 +414,45 @@ class SideDock {
         });
 
         this.popup.addEventListener('mouseleave', (e) => {
-            console.log('[SideDock Debug] Mouse left popup'); // Add log
+            // Mouse left popup
 
             // 检查鼠标是否移动到了侧边栏和屏幕边缘之间的区域
             // 如果鼠标位置在侧边栏左侧（即屏幕边缘和侧边栏之间），则不隐藏侧边栏
             if (e.clientX < this.popup.getBoundingClientRect().left && e.clientX >= 0) {
-                console.log('[SideDock Debug] Mouse moved to the area between sidebar and screen edge, not hiding');
+                // Mouse moved to the area between sidebar and screen edge, not hiding
                 return;
             }
 
             // 鼠标离开侧边栏时，立即隐藏
             const isEditVisible = this.editModal && this.editModal.style.display !== 'none';
             const isContextMenuVisible = this.contextMenu && this.contextMenu.style.display === 'block';
+            const isGroupPopupVisible = this.groupPopup !== null; // 检查分组弹窗是否显示
 
-            if (this.visible && !isEditVisible && !isContextMenuVisible) {
+            if (this.visible && !isEditVisible && !isContextMenuVisible && !isGroupPopupVisible) {
                // 延迟隐藏，给拖拽操作完成留出时间
                setTimeout(() => {
-                   console.log('[SideDock Debug] Conditions met, calling hide() from popup mouseleave');
                    this.hide();
                }, 200); // 200ms 延迟
                // Redundant timer clear, hide() handles this now
                 // if (this.hideTimer) {
                 //     clearTimeout(this.hideTimer);
                 //     this.hideTimer = null;
-                //     console.log('[SideDock Debug] Cleared hideTimer in popup mouseleave (should not happen)');
+                //     // Cleared hideTimer in popup mouseleave (should not happen)
                 // }
             } else {
-                console.log(`[SideDock Debug] Conditions not met for hiding from popup mouseleave (visible: ${this.visible}, editVisible: ${isEditVisible}, contextMenuVisible: ${isContextMenuVisible})`);
+                // Conditions not met for hiding from popup mouseleave
             }
         });
 
         // 添加快捷键切换侧边栏显示状态
         document.addEventListener('keydown', (e) => {
             // 输出当前按下的键和快捷键设置，用于调试
-            console.log('[SideDock Debug] Key pressed:', e.key.toLowerCase(),
-                        'Ctrl:', e.ctrlKey,
-                        'Alt:', e.altKey,
-                        'Shift:', e.shiftKey,
-                        'Meta:', e.metaKey);
-            console.log('[SideDock Debug] Current shortcut setting:',
-                        'Key:', this.shortcut.key,
-                        'Ctrl:', this.shortcut.ctrl,
-                        'Alt:', this.shortcut.alt,
-                        'Shift:', this.shortcut.shift,
-                        'Command:', this.shortcut.command);
 
             // Skip if the active element is an input field
             if (document.activeElement.tagName === 'INPUT' ||
                 document.activeElement.tagName === 'TEXTAREA' ||
                 document.activeElement.isContentEditable) {
-                console.log('[SideDock Debug] Ignoring shortcut in input field:', document.activeElement.tagName);
+                // Ignoring shortcut in input field
                 return;
             }
 
@@ -500,16 +464,10 @@ class SideDock {
             // 处理command属性，如果不存在则默认为false
             const commandMatches = e.metaKey === !!this.shortcut.command;
 
-            console.log('[SideDock Debug] Shortcut match check:',
-                        'Key:', keyMatches,
-                        'Ctrl:', ctrlMatches,
-                        'Alt:', altMatches,
-                        'Shift:', shiftMatches,
-                        'Command:', commandMatches);
+            // Shortcut match check
 
             if (keyMatches && ctrlMatches && altMatches && shiftMatches && commandMatches) {
                 e.preventDefault();
-                console.log('[SideDock Debug] Shortcut detected, toggling sidebar');
                 this.togglePopup();
             }
         });
@@ -581,7 +539,7 @@ class SideDock {
                 try {
                     await this.handleImageUpload(file);
                 } catch (error) {
-                    console.error('Error uploading image:', error);
+                    // Error uploading image
                     // 如果上传失败，使用默认图标
                     const titleInput = this.editModal.querySelector('.edit-title');
                     const img = this.editModal.querySelector('.edit-app-icon img');
@@ -612,7 +570,7 @@ class SideDock {
                     }
                 }
             } catch (err) {
-                console.error('Failed to read clipboard contents: ', err);
+                // Failed to read clipboard contents
             }
             iconContextMenu.style.display = 'none';
         });
@@ -632,7 +590,7 @@ class SideDock {
                     img.src = favicon;
                 } catch (error) {
                     // If URL is invalid, generate default icon
-                    console.error('Failed to reset icon:', error);
+                    // Failed to reset icon
                     img.src = this.generateDefaultIcon(titleInput.value);
                 }
             }
@@ -655,7 +613,7 @@ class SideDock {
         this.loadApps();
 
         // 侧边栏默认已隐藏，指示条已设置为闲置状态
-        console.log('[SideDock Debug] Sidebar initialized in hidden state with idle indicator');
+        // Sidebar initialized in hidden state with idle indicator
 
         // 定期更新图标活跃状态
         this.updateActiveStatus();
@@ -663,7 +621,7 @@ class SideDock {
 
         // 设置初始化标志
         this.isInitialized = true;
-        console.log('SideDock initialization complete');
+        // SideDock initialization complete
     }
 
     createAppIcon(app, index) {
@@ -775,7 +733,7 @@ class SideDock {
     }
 
     // 获取拖拽目标位置的辅助方法
-    getDragAfterElement(container, y) {
+    getDragAfterElement(_, y) {
         const draggableElements = [...this.popup.querySelectorAll('.app-icon:not(.dragging)')];
 
         return draggableElements.reduce((closest, child) => {
@@ -794,21 +752,21 @@ class SideDock {
         try {
             // 检查是否已经在加载中
             if (this.isLoadingApps) {
-                console.warn('Already loading apps, skipping duplicate call');
+                // Already loading apps, skipping duplicate call
                 return;
             }
 
             // 设置加载标志
             this.isLoadingApps = true;
-            console.log('Loading apps...');
+            // Loading apps...
 
             // 检查DOM元素是否存在
             if (!this.domElements.appList) {
-                console.error('App list element not found, re-initializing DOM references');
+                // App list element not found, re-initializing DOM references
                 this.domElements.appList = this.popup.querySelector('.app-list');
 
                 if (!this.domElements.appList) {
-                    console.error('Failed to find app list element, aborting loadApps');
+                    // Failed to find app list element, aborting loadApps
                     return;
                 }
             }
@@ -817,10 +775,10 @@ class SideDock {
             const apps = await this.getApps();
             const appList = this.domElements.appList;
 
-            console.log(`App list element: ${appList.tagName}, children: ${appList.children.length}`);
+            // App list element
 
             // 在操作 DOM 前先完全清空应用列表容器
-            console.log('Clearing app list container...');
+            // Clearing app list container...
 
             // 先尝试使用 removeChild 方法清空
             try {
@@ -828,24 +786,24 @@ class SideDock {
                     appList.removeChild(appList.firstChild);
                 }
             } catch (error) {
-                console.error('Error removing children one by one:', error);
+                // Error removing children one by one
             }
 
             // 再次检查是否清空
             if (appList.children.length > 0) {
-                console.warn(`Failed to clear app list with removeChild, still has ${appList.children.length} children`);
+                // Failed to clear app list with removeChild
 
                 // 尝试使用 innerHTML 强制清空
                 try {
                     appList.innerHTML = '';
-                    console.log('Cleared app list using innerHTML');
+                    // Cleared app list using innerHTML
                 } catch (error) {
-                    console.error('Error clearing with innerHTML:', error);
+                    // Error clearing with innerHTML
                 }
 
                 // 再次检查
                 if (appList.children.length > 0) {
-                    console.warn(`Still failed to clear app list, has ${appList.children.length} children`);
+                    // Still failed to clear app list
 
                     // 最后尝试重新创建元素
                     try {
@@ -855,25 +813,25 @@ class SideDock {
                             appList.parentNode.replaceChild(newAppList, appList);
                             this.domElements.appList = newAppList;
                             appList = newAppList;
-                            console.log('Replaced app list element with a new one');
+                            // Replaced app list element with a new one
                         }
                     } catch (error) {
-                        console.error('Error replacing app list element:', error);
+                        // Error replacing app list element
                     }
                 }
             }
 
-            console.log(`App list now has ${appList.children.length} children after clearing`);
+            // App list now has children after clearing
 
             // 获取当前所有打开的标签页
             const openTabs = await this.getOpenTabs();
 
-            console.log(`Found ${apps.length} apps to load`);
+            // Found apps to load
 
             // 添加所有应用图标
             for (let i = 0; i < apps.length; i++) {
                 const app = apps[i];
-                console.log(`Creating icon for app ${i}: ${app.title}`);
+                // Creating icon for app
 
                 // 确保应用有有效的图标
                 if (!app.favicon || app.favicon === 'null' || app.favicon === 'undefined') {
@@ -892,27 +850,27 @@ class SideDock {
                                         try {
                                             chrome.storage.local.set({ apps: allApps }, () => {
                                                 if (chrome.runtime.lastError) {
-                                                    console.warn('Error saving updated favicon:', chrome.runtime.lastError);
+                                                    // Error saving updated favicon
                                                     reject(new Error(chrome.runtime.lastError.message));
                                                     return;
                                                 }
                                                 resolve();
                                             });
                                         } catch (storageError) {
-                                            console.error('Error in chrome.storage.local.set during favicon update:', storageError);
+                                            // Error in chrome.storage.local.set during favicon update
                                             reject(storageError);
                                         }
                                     });
                                 }
                             } catch (storageError) {
-                                console.warn('Error updating favicon in storage:', storageError);
+                                // Error updating favicon in storage
                                 // 继续使用已获取的图标，但不保存
                             }
                         } else {
-                            console.warn('Chrome storage API not available, favicon will not be saved');
+                            // Chrome storage API not available, favicon will not be saved
                         }
                     } catch (error) {
-                        console.error('Error updating favicon:', error);
+                        // Error updating favicon
                         app.favicon = this.generateDefaultIcon(app.title);
                     }
                 }
@@ -953,7 +911,7 @@ class SideDock {
                 });
 
                 // {{edit 2: Modify dragend listener}}
-                appIcon.addEventListener('dragend', (e) => {
+                appIcon.addEventListener('dragend', (_) => {
                     // Use querySelector to ensure we remove class from the correct element if it exists
                     const draggingElem = this.popup?.querySelector('.app-icon.dragging');
                     if (draggingElem) {
@@ -961,7 +919,7 @@ class SideDock {
                     }
                     // Reset isDragging flag when drag operation concludes
                     this.isDragging = false;
-                    // console.log('Drag ended, isDragging set to false');
+                    // Drag ended, isDragging set to false
                     // Clear dataTransfer data (optional, good practice)
                     // e.dataTransfer.clearData(); // This might cause issues on some browsers, test carefully
                 });
@@ -1002,12 +960,12 @@ class SideDock {
                     const draggedElement = this.popup?.querySelector('.dragging');
                     // Ensure drop happens on a valid target and we were dragging something
                     if (!draggedElement || !appIcon.classList.contains('app-icon')) {
-                        console.warn('Drop happened on invalid target or no element was being dragged.');
+                        // Drop happened on invalid target or no element was being dragged
                         // Ensure drag state is reset anyway (handled by dragend)
                         return;
                     }
 
-                    console.log('[DEBUG] Drop event triggered');
+                    // Drop event triggered
 
                     // 获取拖拽元素和目标元素的索引
                     const draggedIndex = parseInt(draggedElement.dataset.index);
@@ -1028,7 +986,7 @@ class SideDock {
 
                     // 如果拖拽到分组上，将应用添加到分组中
                     if (isTargetGroup && !isDraggedGroup) {
-                        console.log(`[DEBUG] Adding app at index ${draggedIndex} to group at index ${targetIndex}`);
+                        // Adding app to group
 
                         // 获取拖拽的应用和目标分组
                         const draggedApp = {...newApps[draggedIndex]};
@@ -1055,7 +1013,7 @@ class SideDock {
                     }
                     // 如果拖拽到普通应用上，创建新分组
                     else if (!isTargetGroup && !isDraggedGroup) {
-                        console.log(`[DEBUG] Creating new group with apps at indices ${targetIndex} and ${draggedIndex}`);
+                        // Creating new group with apps
 
                         // 获取拖拽的应用和目标应用
                         const draggedApp = {...newApps[draggedIndex]};
@@ -1089,7 +1047,7 @@ class SideDock {
                         const originalSendMessage = chrome.runtime.sendMessage;
                         chrome.runtime.sendMessage = function(message, callback) {
                             if (message && message.action === 'updateApps') {
-                                console.warn('[DEBUG] Intercepted updateApps message, preventing it from being sent');
+                                // Intercepted updateApps message, preventing it from being sent
                                 if (callback) {
                                     setTimeout(() => {
                                         callback({ success: true, intercepted: true });
@@ -1106,7 +1064,7 @@ class SideDock {
 
                             // Check if elements exist before proceeding
                             if (!finalAppIcons.length || !originalApps.length) {
-                                console.error('Could not get final icons or original apps data during drop.');
+                                // Could not get final icons or original apps data during drop
                                 return;
                             }
 
@@ -1116,7 +1074,7 @@ class SideDock {
                                 if (app && app.url) {
                                     appDataMap.set(app.url, app);
                                 } else {
-                                    console.warn('Found app with missing URL in originalApps during drop mapping');
+                                    // Found app with missing URL in originalApps during drop mapping
                                 }
                             });
 
@@ -1131,24 +1089,23 @@ class SideDock {
                                     // Update data-index immediately to match new DOM order
                                     icon.dataset.index = index.toString();
                                 } else {
-                                    console.error(`Data inconsistency: Could not find app data for URL: ${url} at DOM index ${index} during reorder.`);
+                                    // Data inconsistency: Could not find app data for URL during reorder
                                     dataConsistent = false;
                                 }
                             });
 
                             // 3. Check for consistency before saving
                             if (!dataConsistent || newApps.length !== originalApps.length) {
-                                console.error("App order inconsistency detected! Aborting save.",
-                                            "Original Count:", originalApps.length, "New Count:", newApps.length);
+                                // App order inconsistency detected! Aborting save
                                 return; // Prevent saving inconsistent data
                             }
                         } catch (error) {
-                            console.error('Error processing drop event:', error);
+                            // Error processing drop event
                         } finally {
                             // 恢复原始的chrome.runtime.sendMessage函数
                             setTimeout(() => {
                                 chrome.runtime.sendMessage = originalSendMessage;
-                                console.log('[DEBUG] Restored original chrome.runtime.sendMessage');
+                                // Restored original chrome.runtime.sendMessage
                             }, 1000);
                         }
                     }
@@ -1158,16 +1115,16 @@ class SideDock {
                         await new Promise((resolve, reject) => {
                             chrome.storage.local.set({ apps: newApps }, () => {
                                 if (chrome.runtime.lastError) {
-                                    console.error('Error saving apps after drop:', chrome.runtime.lastError);
+                                    // Error saving apps after drop
                                     reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
                                 } else {
-                                    console.log('Apps saved successfully after drop');
+                                    // Apps saved successfully after drop
                                     resolve();
                                 }
                             });
                         });
                     } catch (storageError) {
-                        console.error('Error saving app order to storage:', storageError);
+                        // Error saving app order to storage
                     }
                     // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
                 });
@@ -1176,7 +1133,7 @@ class SideDock {
                 appList.appendChild(appIcon);
             }
 
-            console.log('Creating add button...');
+            // Creating add button...
 
             // 添加"加用"按钮
             const addButton = document.createElement('div');
@@ -1193,10 +1150,10 @@ class SideDock {
             // 添加到应用列表
             appList.appendChild(addButton);
 
-            console.log(`App list now has ${appList.children.length} children`);
-            console.log('Apps loaded successfully');
+            // App list now has children
+            // Apps loaded successfully
         } catch (error) {
-            console.error('Error loading apps:', error);
+            // Error loading apps
         } finally {
             // 重置加载标志
             this.isLoadingApps = false;
@@ -1204,11 +1161,11 @@ class SideDock {
     }
 
     async getApps() {
-        console.log('Getting apps from storage...');
+        // Getting apps from storage...
 
         // 检查chrome API是否可用
         if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-            console.warn('Chrome storage API not available, returning empty apps array');
+            // Chrome storage API not available, returning empty apps array
             return [];
         }
 
@@ -1217,30 +1174,30 @@ class SideDock {
                 chrome.storage.local.get(['apps'], (result) => {
                     // 检查是否有错误
                     if (chrome.runtime.lastError) {
-                        console.warn('Error getting apps from storage:', chrome.runtime.lastError);
+                        // Error getting apps from storage
                         resolve([]);
                         return;
                     }
 
                     // 检查结果是否有效
                     if (!result || !result.apps) {
-                        console.log('No apps found in storage, returning empty array');
+                        // No apps found in storage, returning empty array
                         resolve([]);
                         return;
                     }
 
                     // 确保返回的是数组
                     if (!Array.isArray(result.apps)) {
-                        console.warn('Apps in storage is not an array, returning empty array');
+                        // Apps in storage is not an array, returning empty array
                         resolve([]);
                         return;
                     }
 
-                    console.log(`Found ${result.apps.length} apps in storage`);
+                    // Found apps in storage
                     resolve(result.apps);
                 });
             } catch (error) {
-                console.error('Error in getApps:', error);
+                // Error in getApps
                 resolve([]);
             }
         });
@@ -1251,7 +1208,7 @@ class SideDock {
         try {
             // 检查URL是否有效
             if (!url) {
-                console.warn('Invalid URL provided to getFaviconFromUrl');
+                // Invalid URL provided to getFaviconFromUrl
                 return this.generateDefaultIcon('?');
             }
 
@@ -1260,7 +1217,7 @@ class SideDock {
 
             // 检查chrome API是否可用
             if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-                console.warn('Chrome runtime API not available, using Google favicon service');
+                // Chrome runtime API not available, using Google favicon service
                 return await this.getGoogleFavicon(domain);
             }
 
@@ -1268,7 +1225,7 @@ class SideDock {
                 // 尝试使用background.js获取图标
                 const response = await new Promise((resolve, reject) => {
                     const timeoutId = setTimeout(() => {
-                        console.warn('Favicon request timed out');
+                        // Favicon request timed out
                         reject(new Error('Timeout'));
                     }, 3000); // 3秒超时
 
@@ -1282,7 +1239,7 @@ class SideDock {
 
                             // 检查是否有错误
                             if (chrome.runtime.lastError) {
-                                console.warn('Error in sendMessage:', chrome.runtime.lastError);
+                                // Error in sendMessage
                                 reject(new Error(chrome.runtime.lastError.message));
                                 return;
                             }
@@ -1291,7 +1248,7 @@ class SideDock {
                         });
                     } catch (error) {
                         clearTimeout(timeoutId);
-                        console.error('Error sending message:', error);
+                        // Error sending message
                         reject(error);
                     }
                 });
@@ -1303,11 +1260,11 @@ class SideDock {
                 // 如果没有有效响应，尝试使用Google服务
                 throw new Error('No valid favicon in response');
             } catch (error) {
-                console.warn('Background favicon fetch failed, trying Google service:', error);
+                // Background favicon fetch failed, trying Google service
                 return await this.getGoogleFavicon(domain);
             }
         } catch (error) {
-            console.error('Error getting favicon:', error);
+            // Error getting favicon
             return this.generateDefaultIcon(url);
         }
     }
@@ -1324,7 +1281,7 @@ class SideDock {
                 reader.readAsDataURL(blob);
             });
         } catch (error) {
-            console.error('Error getting Google favicon:', error);
+            // Error getting Google favicon
             return this.generateDefaultIcon(domain);
         }
     }
@@ -1370,7 +1327,7 @@ class SideDock {
 
             // 确保是分组
             if (!app || !app.isGroup) {
-                console.warn('Attempted to toggle a non-group app');
+                // Attempted to toggle a non-group app
                 return;
             }
 
@@ -1384,7 +1341,7 @@ class SideDock {
             }
 
         } catch (error) {
-            console.error('Error toggling group:', error);
+            // Error toggling group
         }
     }
 
@@ -1401,7 +1358,7 @@ class SideDock {
         popup.className = 'group-popup sidedock-extension';
 
         // 添加子应用图标
-        children.forEach((child, i) => {
+        children.forEach((child, _) => {
             const appIcon = document.createElement('div');
             appIcon.className = 'popup-app-icon';
             appIcon.title = child.title;
@@ -1564,7 +1521,7 @@ class SideDock {
             childIcon.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: child.url }, (response) => {
+                    chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: child.url }, (_) => {
                         if (chrome.runtime.lastError) {
                             window.open(child.url, '_blank');
                         }
@@ -1641,7 +1598,7 @@ class SideDock {
 
             // 确保是分组且有子应用
             if (!group || !group.isGroup || !group.children || childIndex >= group.children.length) {
-                console.warn('Invalid group or child index');
+                // Invalid group or child index
                 return;
             }
 
@@ -1668,10 +1625,10 @@ class SideDock {
             await new Promise((resolve, reject) => {
                 chrome.storage.local.set({ apps }, () => {
                     if (chrome.runtime.lastError) {
-                        console.error('Error removing from group:', chrome.runtime.lastError);
+                        // Error removing from group
                         reject(new Error(chrome.runtime.lastError.message));
                     } else {
-                        console.log('App removed from group successfully');
+                        // App removed from group successfully
                         resolve();
                     }
                 });
@@ -1681,7 +1638,7 @@ class SideDock {
             this.loadApps();
 
         } catch (error) {
-            console.error('Error removing from group:', error);
+            // Error removing from group
         }
     }
 
@@ -1693,7 +1650,7 @@ class SideDock {
 
             // 确保是分组且有子应用
             if (!group || !group.isGroup || !group.children || group.children.length === 0) {
-                console.warn('Invalid group or no children');
+                // Invalid group or no children
                 this.hideContextMenu();
                 return;
             }
@@ -1711,10 +1668,10 @@ class SideDock {
             await new Promise((resolve, reject) => {
                 chrome.storage.local.set({ apps }, () => {
                     if (chrome.runtime.lastError) {
-                        console.error('Error ungrouping:', chrome.runtime.lastError);
+                        // Error ungrouping
                         reject(new Error(chrome.runtime.lastError.message));
                     } else {
-                        console.log('Group disbanded successfully');
+                        // Group disbanded successfully
                         resolve();
                     }
                 });
@@ -1727,7 +1684,7 @@ class SideDock {
             this.loadApps();
 
         } catch (error) {
-            console.error('Error ungrouping:', error);
+            // Error ungrouping
             this.hideContextMenu();
         }
     }
@@ -1803,14 +1760,14 @@ class SideDock {
                         const favicon = await this.getFaviconFromUrl(url);
                         iconImg.src = favicon;
                     } catch (error) {
-                        console.error('Error fetching favicon:', error);
+                        // Error fetching favicon
                         iconImg.src = this.generateDefaultIcon(titleInput.value);
                     } finally {
                         iconImg.style.opacity = '1';
                     }
                 }, 1000); // 1秒延迟
             } catch (error) {
-                console.error('Invalid URL:', error);
+                // Invalid URL
                 iconImg.src = this.generateDefaultIcon(titleInput.value);
             }
         };
@@ -1843,66 +1800,66 @@ class SideDock {
 
     async handleDelete() {
         try {
-            console.log('Deleting app...');
+            // Deleting app...
 
             // 检查chrome API是否可用
             if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                console.error('Chrome storage API not available');
+                // Chrome storage API not available
                 return;
             }
 
             try {
                 const apps = await this.getApps();
-                console.log(`Current apps count: ${apps.length}, deleting index: ${this.currentAppIndex}`);
+                // Current apps count, deleting index
 
                 // 确保索引有效
                 if (this.currentAppIndex !== null && this.currentAppIndex >= 0 && this.currentAppIndex < apps.length) {
                     // 删除应用
                     apps.splice(this.currentAppIndex, 1);
-                    console.log(`App deleted, new count: ${apps.length}`);
+                    // App deleted
 
                     // 保存更新后的应用列表
                     await new Promise((resolve, reject) => {
                         try {
                             chrome.storage.local.set({ apps }, () => {
                                 if (chrome.runtime.lastError) {
-                                    console.warn('Error saving apps after delete:', chrome.runtime.lastError);
+                                    // Error saving apps after delete
                                     reject(new Error(chrome.runtime.lastError.message));
                                     return;
                                 }
                                 resolve();
                             });
                         } catch (error) {
-                            console.error('Error in chrome.storage.local.set during delete:', error);
+                            // Error in chrome.storage.local.set during delete
                             reject(error);
                         }
                     });
 
-                    console.log('Apps saved successfully after delete');
+                    // Apps saved successfully after delete
 
                     // 隐藏右键菜单
                     this.hideContextMenu();
 
                     // 不需要手动重新加载，因为 storage 变更会触发自动重新加载
-                    console.log('Storage updated, waiting for automatic reload after delete');
+                    // Storage updated, waiting for automatic reload after delete
                 } else {
-                    console.error('Invalid app index:', this.currentAppIndex);
+                    // Invalid app index
                 }
             } catch (storageError) {
-                console.error('Error accessing storage during delete:', storageError);
+                // Error accessing storage during delete
             }
         } catch (error) {
-            console.error('Error deleting app:', error);
+            // Error deleting app
         }
     }
 
     async handleSaveEdit() {
         try {
-            console.log('Saving edit...');
+            // Saving edit...
 
             // 检查DOM元素
             if (!this.domElements || !this.domElements.editTitle || !this.domElements.editUrl || !this.domElements.editAppIconImg) {
-                console.error('Required DOM elements not found');
+                // Required DOM elements not found
                 return;
             }
 
@@ -1914,20 +1871,20 @@ class SideDock {
             let url = urlInput.value.trim();
 
             if (!title || !url) {
-                console.error('Title and URL are required');
+                // Title and URL are required
                 return;
             }
 
             // 自动补全 URL
             url = this.autoCompleteUrl(url);
-            console.log(`Saving app: ${title} (${url})`);
+            // Saving app
 
             // 获取当前显示的图标
             const favicon = iconImg.src;
 
             // 检查chrome API是否可用
             if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                console.error('Chrome storage API not available');
+                // Chrome storage API not available
                 return;
             }
 
@@ -1937,19 +1894,19 @@ class SideDock {
                     try {
                         chrome.storage.local.get(['apps'], (result) => {
                             if (chrome.runtime.lastError) {
-                                console.warn('Error getting apps:', chrome.runtime.lastError);
+                                // Error getting apps
                                 reject(new Error(chrome.runtime.lastError.message));
                                 return;
                             }
                             resolve(result && result.apps ? result.apps : []);
                         });
                     } catch (error) {
-                        console.error('Error in chrome.storage.local.get:', error);
+                        // Error in chrome.storage.local.get
                         reject(error);
                     }
                 });
 
-                console.log(`Current apps count: ${apps.length}`);
+                // Current apps count
 
                 // 准备新的应用对象
                 const appData = {
@@ -1961,11 +1918,11 @@ class SideDock {
                 // 更新或添加应用
                 if (this.currentAppIndex !== null && this.currentAppIndex >= 0 && this.currentAppIndex < apps.length) {
                     // 更新现有应用
-                    console.log(`Updating existing app at index ${this.currentAppIndex}`);
+                    // Updating existing app at index
                     apps[this.currentAppIndex] = appData;
                 } else {
                     // 添加新应用
-                    console.log('Adding new app');
+                    // Adding new app
                     apps.push(appData);
                 }
 
@@ -1974,30 +1931,30 @@ class SideDock {
                     try {
                         chrome.storage.local.set({ apps }, () => {
                             if (chrome.runtime.lastError) {
-                                console.warn('Error saving apps:', chrome.runtime.lastError);
+                                // Error saving apps
                                 reject(new Error(chrome.runtime.lastError.message));
                                 return;
                             }
                             resolve();
                         });
                     } catch (error) {
-                        console.error('Error in chrome.storage.local.set:', error);
+                        // Error in chrome.storage.local.set
                         reject(error);
                     }
                 });
 
-                console.log('Apps saved successfully');
+                // Apps saved successfully
 
                 // 隐藏编辑模态框
                 this.hideEditModal();
 
                 // 不需要手动重新加载，因为 storage 变更会触发自动重新加载
-                console.log('Edit saved, waiting for automatic reload');
+                // Edit saved, waiting for automatic reload
             } catch (storageError) {
-                console.error('Error accessing storage:', storageError);
+                // Error accessing storage
             }
         } catch (error) {
-            console.error('Error saving edit:', error);
+            // Error saving edit
         }
     }
 
@@ -2031,7 +1988,7 @@ class SideDock {
 
     async handleImageError(img, title, index) {
         try {
-            console.log(`Handling image error for ${title}`);
+            // Handling image error
             const defaultIcon = this.generateDefaultIcon(title);
             img.src = defaultIcon;
 
@@ -2039,7 +1996,7 @@ class SideDock {
             if (index !== undefined) {
                 // 检查chrome API是否可用
                 if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                    console.warn('Chrome storage API not available, cannot save default icon');
+                    // Chrome storage API not available, cannot save default icon
                     return;
                 }
 
@@ -2052,38 +2009,38 @@ class SideDock {
                             try {
                                 chrome.storage.local.set({ apps }, () => {
                                     if (chrome.runtime.lastError) {
-                                        console.warn('Error saving default icon:', chrome.runtime.lastError);
+                                        // Error saving default icon
                                         reject(new Error(chrome.runtime.lastError.message));
                                         return;
                                     }
-                                    console.log('Default icon saved successfully');
+                                    // Default icon saved successfully
                                     resolve();
                                 });
                             } catch (storageError) {
-                                console.error('Error in chrome.storage.local.set during icon error handling:', storageError);
+                                // Error in chrome.storage.local.set during icon error handling
                                 reject(storageError);
                             }
                         });
                     } else {
-                        console.warn(`Invalid app index: ${index}, cannot save default icon`);
+                        // Invalid app index, cannot save default icon
                     }
                 } catch (storageError) {
-                    console.error('Error accessing storage during icon error handling:', storageError);
+                    // Error accessing storage during icon error handling
                 }
             }
         } catch (error) {
-            console.error('Error in handleImageError:', error);
+            // Error in handleImageError
             // 即使出错也不要抛出异常，因为这是错误处理函数
         }
     }
 
     // 侧边栏显示方法
     show() {
-        console.log('[SideDock Debug] show() called'); // Add log
+        // show() called
 
         // 防抖动：检查是否正在显示中
         if (this.visible && this.popup && this.popup.classList.contains('visible')) {
-            console.log('[SideDock Debug] Sidebar already visible, ignoring redundant show() call');
+            // Sidebar already visible, ignoring redundant show() call
             return;
         }
 
@@ -2091,7 +2048,7 @@ class SideDock {
         if (this.popup) {
             this.popup.classList.add('visible');
             this.visible = true;
-            console.log('[SideDock Debug] Popup shown, visible set to true. Popup Classes:', this.popup.classList.toString());
+            // Popup shown, visible set to true
 
             // 移除临时样式（如果之前添加过）
             // 不再需要设置opacity，因为我们始终保持不透明度为1
@@ -2099,30 +2056,30 @@ class SideDock {
             this.popup.style.visibility = '';
             this.popup.style.left = '';
         } else {
-            console.log('[SideDock Debug] Popup not found in show()');
+            // Popup not found in show()
         }
 
         // 当侧边栏显示时，完全隐藏触发区域（指示条）
         if (this.triggerZone) {
-            console.log('[SideDock Debug] Updating triggerZone in show()');
+            // Updating triggerZone in show()
             this.triggerZone.style.display = 'none'; // 完全隐藏触发区域
             this.triggerZone.classList.remove('visible');
             this.triggerZone.classList.remove('active');
             this.triggerZone.classList.remove('idle');
-            console.log('[SideDock Debug] triggerZone hidden. Classes:', this.triggerZone.classList.toString());
+            // triggerZone hidden
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[SideDock Debug] Cleared triggerIdleTimer in show()');
+                // Cleared triggerIdleTimer in show()
             }
         } else {
-            console.log('[SideDock Debug] triggerZone not found in show()');
+            // triggerZone not found in show()
         }
     }
 
     togglePopup() {
         // 切换侧边栏的显示/隐藏状态
-        console.log('[SideDock Debug] togglePopup called, current visible state:', this.visible);
+        // togglePopup called
         if (this.visible) {
             this.hide();
         } else {
@@ -2143,7 +2100,7 @@ class SideDock {
                     try {
                         // 设置超时处理
                         const timeoutId = setTimeout(() => {
-                            console.info('Note: getOpenTabs request timed out, using empty tabs list');
+                            // getOpenTabs request timed out, using empty tabs list
                             resolve([]);
                         }, 3000); // 增加到3秒超时
 
@@ -2152,15 +2109,14 @@ class SideDock {
 
                             // 检查运行时错误
                             if (chrome.runtime.lastError) {
-                                console.info('Note: Chrome runtime returned error for getOpenTabs:',
-                                    chrome.runtime.lastError.message || 'Unknown error');
+                                // Chrome runtime returned error for getOpenTabs
                                 resolve([]);
                                 return;
                             }
 
                             // 验证响应数据
                             if (!response || !Array.isArray(response.tabs)) {
-                                console.info('Note: Invalid response format from getOpenTabs');
+                                // Invalid response format from getOpenTabs
                                 resolve([]);
                                 return;
                             }
@@ -2168,16 +2124,15 @@ class SideDock {
                             resolve(response.tabs);
                         });
                     } catch (sendError) {
-                        console.info('Note: Failed to send getOpenTabs message:',
-                            sendError.message || sendError);
+                        // Failed to send getOpenTabs message
                         resolve([]);
                     }
                 } else {
-                    console.info('Note: Chrome runtime API not available for getOpenTabs');
+                    // Chrome runtime API not available for getOpenTabs
                     resolve([]);
                 }
             } catch (error) {
-                console.error('Unexpected error in getOpenTabs:', error);
+                // Unexpected error in getOpenTabs
                 resolve([]);
             }
         });
@@ -2191,7 +2146,7 @@ class SideDock {
             // 规范化URL以进行比较
             const appUrlObj = new URL(appUrl);
             const appDomain = appUrlObj.hostname;
-            const appPath = appUrlObj.pathname + appUrlObj.search;
+            // const appPath = appUrlObj.pathname + appUrlObj.search;
 
             // 检查是否有匹配的标签页
             return openTabs.some(tab => {
@@ -2219,7 +2174,7 @@ class SideDock {
         try {
             // 检查popup是否存在
             if (!this.popup) {
-                console.warn('Popup element not found, cannot update active status');
+                // Popup element not found, cannot update active status
                 return;
             }
 
@@ -2267,11 +2222,11 @@ class SideDock {
                         }
                     }
                 } catch (error) {
-                    console.error('Error updating icon status:', error);
+                    // Error updating icon status
                 }
             });
         } catch (error) {
-            console.error('Error in updateActiveStatus:', error);
+            // Error in updateActiveStatus
         }
     }
 
@@ -2301,14 +2256,14 @@ class SideDock {
                     resolve(canvas.toDataURL('image/jpeg', 0.7));
                 } catch (error) {
                     // 果出现跨域错误，尝试直接使用原始数据
-                    console.warn('Failed to compress image:', error);
+                    // Failed to compress image
                     resolve(dataUrl);
                 }
             };
 
             img.onerror = () => {
                 // 如果加载失败，返回原始数据
-                console.warn('Failed to load image');
+                // Failed to load image
                 resolve(dataUrl);
             };
 
@@ -2354,11 +2309,11 @@ class SideDock {
 
     async handleAddApp() {
         try {
-            console.log('Adding new app...');
+            // Adding new app...
 
             // 检查chrome API是否可用
             if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                console.error('Chrome storage API not available, cannot add app');
+                // Chrome storage API not available, cannot add app
                 return;
             }
 
@@ -2367,16 +2322,16 @@ class SideDock {
             const url = window.location.href;
 
             if (!url) {
-                console.error('Cannot get current URL');
+                // Cannot get current URL
                 return;
             }
 
-            console.log(`Adding app: ${title} (${url})`);
+            // Adding app
 
             try {
                 // 检查是否已经添加过该应用
                 const existingApps = await this.getApps();
-                console.log(`Checking against ${existingApps.length} existing apps`);
+                // Checking against existing apps
 
                 let duplicateIndex = -1;
                 const isDuplicate = existingApps.some((app, index) => {
@@ -2391,20 +2346,20 @@ class SideDock {
                         const appFullUrl = `${appUrl.origin}${appUrl.pathname}`;
                         const currentFullUrl = `${currentUrl.origin}${currentUrl.pathname}`;
 
-                        console.log(`比较URL: ${appFullUrl} 与 ${currentFullUrl}`);
+                        // 比较URL
 
                         const isMatch = appFullUrl === currentFullUrl;
                         if (isMatch) {
-                            console.log('找到重复应用，完整URL匹配');
+                            // 找到重复应用，完整URL匹配
                             duplicateIndex = index;
                         }
                         return isMatch;
                     } catch (e) {
-                        console.warn('Error comparing URLs:', e);
+                        // Error comparing URLs
                         // 如果无法解析URL，则直接比较字符串
                         const isMatch = app.url === url;
                         if (isMatch) {
-                            console.log('找到重复应用，字符串匹配');
+                            // 找到重复应用，字符串匹配
                             duplicateIndex = index;
                         }
                         return isMatch;
@@ -2412,7 +2367,7 @@ class SideDock {
                 });
 
                 if (isDuplicate) {
-                    console.log('该应用已经添加过了');
+                    // 该应用已经添加过了
 
                     // 高亮显示已添加的应用图标
                     this.highlightDuplicateApp(duplicateIndex);
@@ -2421,12 +2376,12 @@ class SideDock {
                 }
 
                 // 获取图标
-                console.log('Getting favicon...');
+                // Getting favicon...
                 let favicon;
                 try {
                     favicon = await this.getFaviconFromUrl(url);
                 } catch (faviconError) {
-                    console.warn('Error getting favicon, using default icon:', faviconError);
+                    // Error getting favicon, using default icon
                     favicon = this.generateDefaultIcon(title);
                 }
 
@@ -2437,34 +2392,34 @@ class SideDock {
                 const apps = await this.getApps();
                 apps.push(app);
 
-                console.log(`Saving app to storage (total apps: ${apps.length})`);
+                // Saving app to storage
 
                 // 保存到存储
                 await new Promise((resolve, reject) => {
                     try {
                         chrome.storage.local.set({ apps }, () => {
                             if (chrome.runtime.lastError) {
-                                console.warn('Error saving app:', chrome.runtime.lastError);
+                                // Error saving app
                                 reject(new Error(chrome.runtime.lastError.message));
                                 return;
                             }
                             resolve();
                         });
                     } catch (error) {
-                        console.error('Error in chrome.storage.local.set during add:', error);
+                        // Error in chrome.storage.local.set during add
                         reject(error);
                     }
                 });
 
-                console.log('App saved, reloading app list...');
+                // App saved, reloading app list...
 
                 // 不需要手动重新加载，因为 storage 变更会触发自动重新加载
-                console.log('App added, waiting for automatic reload');
+                // App added, waiting for automatic reload
             } catch (storageError) {
-                console.error('Error accessing storage during add:', storageError);
+                // Error accessing storage during add
             }
         } catch (error) {
-            console.error('Error adding app:', error);
+            // Error adding app
         }
     }
 
@@ -2501,35 +2456,35 @@ class SideDock {
                 targetIcon.classList.remove('duplicate-highlight');
             }, 2500); // 与动画时间匹配（0.8s * 3 = 2.4s）
         } catch (error) {
-            console.error('Error highlighting duplicate app:', error);
+            // Error highlighting duplicate app
         }
     }
 
     // 侧边栏自动隐藏实现 - 已移至上方的show()方法
 
     hide() {
-        console.log('[SideDock Debug] hide() called'); // Add log
+        // hide() called
 
         // 防抖动：检查是否已经隐藏
         if (!this.visible && this.popup && !this.popup.classList.contains('visible')) {
-            console.log('[SideDock Debug] Sidebar already hidden, ignoring redundant hide() call');
+            // Sidebar already hidden, ignoring redundant hide() call
             return;
         }
 
         if (this.popup) {
             this.popup.classList.remove('visible');
             this.visible = false;
-            console.log('[SideDock Debug] Popup hidden, visible set to false. Popup Classes:', this.popup.classList.toString());
+            // Popup hidden, visible set to false
         } else {
-            console.log('[SideDock Debug] Popup not found in hide()');
+            // Popup not found in hide()
         }
         if (this.triggerZone) {
-            console.log('[SideDock Debug] Updating triggerZone in hide()');
+            // Updating triggerZone in hide()
             // 清除可能存在的闲置定时器
             if (this.triggerIdleTimer) {
                 clearTimeout(this.triggerIdleTimer);
                 this.triggerIdleTimer = null;
-                console.log('[SideDock Debug] Cleared triggerIdleTimer in hide()');
+                // Cleared triggerIdleTimer in hide()
             }
 
             // 隐藏触发区域，稍后再显示
@@ -2548,21 +2503,21 @@ class SideDock {
 
                     // 显示触发区域（半透明白色指示条）
                     this.triggerZone.style.display = 'block';
-                    console.log('[SideDock Debug] triggerZone shown after delay with animation. Classes:', this.triggerZone.classList.toString());
+                    // triggerZone shown after delay with animation
 
                     // 启动闲置定时器，在一段时间后使指示线变得更微弱
                     this.triggerIdleTimer = setTimeout(() => {
-                        console.log('[SideDock Debug] Idle timer fired in hide()');
+                        // Idle timer fired in hide()
                         if (!this.visible && this.triggerZone && this.triggerZone.style.display !== 'none') {
                             this.triggerZone.classList.add('idle');
-                            console.log('[SideDock Debug] Added idle class to triggerZone in hide(). Classes:', this.triggerZone.classList.toString());
+                            // Added idle class to triggerZone in hide()
                         }
                         this.triggerIdleTimer = null;
                     }, this.IDLE_DELAY);
                 }
             }, 500); // 0.5秒延迟
         } else {
-            console.log('[SideDock Debug] triggerZone not found in hide()');
+            // triggerZone not found in hide()
         }
     }
 
@@ -2590,24 +2545,24 @@ class SideDock {
     try {
         // 检查是否已经创建了实例
         if (window.sideDock && window.sideDock instanceof SideDock) {
-            console.log('SideDock already initialized, reusing existing instance');
+            // SideDock already initialized, reusing existing instance
 
             // 如果实例已存在，不需要重新加载应用列表
             // 因为实例已经在初始化时加载了应用列表
-            console.log('Using existing SideDock instance, no need to reload apps');
+            // Using existing SideDock instance, no need to reload apps
         } else {
-            console.log('Creating new SideDock instance...');
+            // Creating new SideDock instance...
             // 创建新实例
             const sideDock = new SideDock();
 
             // 确保实例正确创建
             if (!window.sideDock) {
-                console.warn('SideDock instance not set in window object, setting it manually');
+                // SideDock instance not set in window object, setting it manually
                 window.sideDock = sideDock;
             }
         }
     } catch (error) {
-        console.error('Error initializing SideDock:', error);
+        // Error initializing SideDock
     }
 })()
 
@@ -2615,7 +2570,7 @@ class SideDock {
 try {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
         // Handle extension messages
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        chrome.runtime.onMessage.addListener((request, _, __) => {
             try {
                 // 检查请求和sideDock实例是否存在
                 if (!request || !window.sideDock) {
@@ -2624,32 +2579,26 @@ try {
 
                 // 处理切换侧边栏显示状态的请求
                 if (request.action === 'toggle') {
-                    console.log('[SideDock Debug] Received toggle message from extension');
+                    // Received toggle message from extension
                     window.sideDock.togglePopup();
                 } else
                 if (request.action === 'updateShortcut' && request.shortcut) {
                     // 处理快捷键更新消息
-                    console.log('[SideDock Debug] Received shortcut update:', JSON.stringify(request.shortcut));
+                    // Received shortcut update
                     window.sideDock.shortcut = request.shortcut;
-                    console.log('[SideDock Debug] Shortcut updated to:',
-                                'Key:', window.sideDock.shortcut.key,
-                                'Ctrl:', window.sideDock.shortcut.ctrl,
-                                'Alt:', window.sideDock.shortcut.alt,
-                                'Shift:', window.sideDock.shortcut.shift,
-                                'Command:', window.sideDock.shortcut.command);
                 } else if (request.action === 'tabsChanged') {
                     // 标签页变化时更新图标状态
                     window.sideDock.updateActiveStatus();
                 }
             } catch (error) {
-                console.error('Error handling extension message:', error);
+                // Error handling extension message
             }
         });
-        console.info('Chrome runtime message listener added successfully');
+        // Chrome runtime message listener added successfully
     } else {
         // 将错误级别从 warn 降低到 info，因为这不是严重错误
-        console.info('Note: Chrome runtime API not available, message listener not added');
+        // Chrome runtime API not available, message listener not added
     }
 } catch (error) {
-    console.info('Note: Error setting up message listener:', error.message || error);
+    // Error setting up message listener
 }

@@ -1,10 +1,10 @@
 // Listen for extension icon clicks
 chrome.action.onClicked.addListener((tab) => {
     // 发送toggle消息，切换侧边栏显示状态
-    chrome.tabs.sendMessage(tab.id, { action: 'toggle' }, (response) => {
+    chrome.tabs.sendMessage(tab.id, { action: 'toggle' }, (_) => {
         // 忽略错误
         if (chrome.runtime.lastError) {
-            console.debug('Could not send toggle message to tab:', tab.id, chrome.runtime.lastError);
+            // Could not send toggle message to tab
         }
     });
 });
@@ -18,7 +18,7 @@ chrome.tabs.onRemoved.addListener(() => {
     notifyTabsChanged();
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener((_, changeInfo) => {
     if (changeInfo.url) {
         notifyTabsChanged();
     }
@@ -33,12 +33,12 @@ function notifyTabsChanged() {
     try {
         chrome.tabs.query({}, (tabs) => {
             if (chrome.runtime.lastError) {
-                console.warn('Error querying tabs:', chrome.runtime.lastError);
+                // Error querying tabs
                 return;
             }
 
             if (!tabs || !Array.isArray(tabs)) {
-                console.warn('No tabs found or invalid tabs array');
+                // No tabs found or invalid tabs array
                 return;
             }
 
@@ -46,35 +46,35 @@ function notifyTabsChanged() {
                 if (!tab || !tab.id) return;
 
                 try {
-                    chrome.tabs.sendMessage(tab.id, { action: 'tabsChanged' }, (response) => {
+                    chrome.tabs.sendMessage(tab.id, { action: 'tabsChanged' }, (_) => {
                         // 检查是否有错误，但不需要处理
                         if (chrome.runtime.lastError) {
                             // 忽略不能发送消息的标签页
-                            // console.debug('Could not send message to tab:', tab.id, chrome.runtime.lastError);
+                            // Could not send message to tab
                         }
                     });
                 } catch (e) {
                     // 忽略不能发送消息的标签页
-                    console.debug('Error sending message to tab:', e);
+                    // Error sending message to tab
                 }
             });
         });
     } catch (error) {
-        console.error('Error in notifyTabsChanged:', error);
+        // Error in notifyTabsChanged
     }
 }
 
 // Listen for messages
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _, sendResponse) => {
     try {
         if (!request || !request.action) {
-            console.warn('Invalid message received');
+            // Invalid message received
             return;
         }
 
         if (request.action === 'openUrl') {
             if (!request.url) {
-                console.warn('No URL provided for openUrl action');
+                // No URL provided for openUrl action
                 return;
             }
             chrome.tabs.create({ url: request.url });
@@ -86,12 +86,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const urlObj = new URL(url);
                 const domain = urlObj.hostname;
 
-                console.log(`Trying to find tab for domain: ${domain}`);
+                // Trying to find tab for domain
 
                 // 先尝试找到完全匹配的URL
                 let matchingTab = tabs.find(tab => tab.url === url);
                 if (matchingTab) {
-                    console.log(`Found exact URL match: ${matchingTab.url}`);
+                    // Found exact URL match
                 }
 
                 // 如果没有完全匹配的，尝试找到域名匹配的
@@ -103,11 +103,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             const tabUrlObj = new URL(tab.url);
                             const isMatch = tabUrlObj.hostname === domain;
                             if (isMatch) {
-                                console.log(`Found domain match: ${tab.url}`);
+                                // Found domain match
                             }
                             return isMatch;
                         } catch (e) {
-                            console.warn(`Error parsing tab URL: ${tab.url}`, e);
+                            // Error parsing tab URL
                             return false;
                         }
                     });
@@ -115,21 +115,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                 if (matchingTab) {
                     // 如果找到匹配的标签页，切换到该标签页
-                    console.log(`Switching to tab: ${matchingTab.id} (${matchingTab.url})`);
+                    // Switching to tab
                     chrome.tabs.update(matchingTab.id, { active: true });
                     chrome.windows.update(matchingTab.windowId, { focused: true });
                     // 发送响应表示成功
                     sendResponse({ success: true, switched: true });
                 } else {
                     // 如果没有找到匹配的标签页，打开新标签页
-                    console.log(`No matching tab found, creating new tab for: ${url}`);
+                    // No matching tab found, creating new tab
                     chrome.tabs.create({ url: url });
                     // 发送响应表示成功
                     sendResponse({ success: true, switched: false });
                 }
             } catch (e) {
                 // 如果出错，直接打开新标签页
-                console.error(`Error in switchOrOpenUrl:`, e);
+                // Error in switchOrOpenUrl
                 chrome.tabs.create({ url: url });
                 // 发送响应表示出错
                 sendResponse({ success: false, error: e.message });
@@ -141,13 +141,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         try {
             chrome.tabs.query({}, (tabs) => {
                 if (chrome.runtime.lastError) {
-                    console.warn('Error querying tabs:', chrome.runtime.lastError);
+                    // Error querying tabs
                     sendResponse({ tabs: [] });
                     return;
                 }
 
                 if (!tabs || !Array.isArray(tabs)) {
-                    console.warn('Invalid tabs result');
+                    // Invalid tabs result
                     sendResponse({ tabs: [] });
                     return;
                 }
@@ -158,7 +158,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
             return true; // 保持消息通道开放
         } catch (error) {
-            console.error('Error in getOpenTabs:', error);
+            // Error in getOpenTabs
             sendResponse({ tabs: [] });
             return true;
         }
@@ -166,18 +166,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // 广播新的快捷键设置到所有标签页
         try {
             if (!request.shortcut) {
-                console.warn('No shortcut provided for updateShortcut action');
+                // No shortcut provided for updateShortcut action
                 return;
             }
 
             chrome.tabs.query({}, (tabs) => {
                 if (chrome.runtime.lastError) {
-                    console.warn('Error querying tabs:', chrome.runtime.lastError);
+                    // Error querying tabs
                     return;
                 }
 
                 if (!tabs || !Array.isArray(tabs)) {
-                    console.warn('Invalid tabs result');
+                    // Invalid tabs result
                     return;
                 }
 
@@ -200,22 +200,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             });
         } catch (error) {
-            console.error('Error in updateShortcut:', error);
+            // Error in updateShortcut
         }
     } else if (request.action === 'getFavicon') {
         (async () => {
             try {
                 // 检查请求参数
                 if (!request.domain) {
-                    console.warn('No domain provided for getFavicon action');
+                    // No domain provided for getFavicon action
                     sendResponse({ favicon: null, error: 'No domain provided' });
                     return;
                 }
 
                 // 首先尝试获取当前标签页的图标
                 const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-                    .catch(error => {
-                        console.warn('Error querying active tab:', error);
+                    .catch(_ => {
+                        // Error querying active tab
                         return [];
                     });
 
@@ -236,7 +236,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             reader.readAsDataURL(blob);
                             return;
                         } catch (error) {
-                            console.error('Error fetching tab favicon:', error, response?.status);
+                            // Error fetching tab favicon
                             // 如果获取失败，继续尝试其他方法
                         }
                     }
@@ -244,13 +244,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                 // 尝试在所有打开的标签页中查找匹配的域名
                 const allTabs = await chrome.tabs.query({})
-                    .catch(error => {
-                        console.warn('Error querying all tabs:', error);
+                    .catch(_ => {
+                        // Error querying all tabs
                         return [];
                     });
 
                 if (!allTabs || !Array.isArray(allTabs)) {
-                    console.warn('Invalid tabs result');
+                    // Invalid tabs result
                     throw new Error('Failed to get tabs');
                 }
 
@@ -269,7 +269,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 return;
                             }
                         } catch (error) {
-                            console.error('Error checking tab:', error);
+                            // Error checking tab
                         }
                     }
                 }
@@ -288,29 +288,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     reader.onloadend = () => {
                         sendResponse({ favicon: reader.result });
                     };
-                    reader.onerror = (error) => {
-                        console.error('Error reading favicon blob:', error);
+                    reader.onerror = (_) => {
+                        // Error reading favicon blob
                         sendResponse({ favicon: null, error: 'Failed to read favicon data' });
                     };
                     reader.readAsDataURL(blob);
                 } catch (error) {
-                    console.error('Error fetching Google favicon:', error);
+                    // Error fetching Google favicon
                     throw error; // 向上抛出错误，让外层catch处理
                 }
             } catch (error) {
-                console.error('Error in getFavicon:', error);
+                // Error in getFavicon
 
                 // 如果所有方法都失败，尝试直接从网站获取
                 try {
                     // 再次检查域名
                     if (!request.domain) {
-                        console.warn('No domain available for direct favicon fetch');
+                        // No domain available for direct favicon fetch
                         sendResponse({ favicon: null, error: 'No domain provided' });
                         return;
                     }
 
                     const faviconUrl = `https://${request.domain}/favicon.ico`;
-                    console.log('Trying direct favicon URL:', faviconUrl);
+                    // Trying direct favicon URL
 
                     try {
                         const response = await fetch(faviconUrl, {
@@ -321,14 +321,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         });
 
                         if (!response.ok) {
-                            console.warn(`Direct favicon fetch failed: ${response.status} ${response.statusText}`);
+                            // Direct favicon fetch failed
                             sendResponse({ favicon: null, error: `HTTP error: ${response.status}` });
                             return;
                         }
 
                         const blob = await response.blob();
                         if (!blob || blob.size === 0) {
-                            console.warn('Empty favicon blob received');
+                            // Empty favicon blob received
                             sendResponse({ favicon: null, error: 'Empty favicon' });
                             return;
                         }
@@ -337,18 +337,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         reader.onloadend = () => {
                             sendResponse({ favicon: reader.result });
                         };
-                        reader.onerror = (error) => {
-                            console.error('Error reading direct favicon blob:', error);
+                        reader.onerror = (_) => {
+                            // Error reading direct favicon blob
                             sendResponse({ favicon: null, error: 'Failed to read favicon data' });
                         };
                         reader.readAsDataURL(blob);
                         return;
                     } catch (fetchError) {
-                        console.error('Error in direct favicon fetch:', fetchError);
+                        // Error in direct favicon fetch
                         throw fetchError;
                     }
                 } catch (error) {
-                    console.error('Error fetching direct favicon:', error);
+                    // Error fetching direct favicon
                     // 所有方法都失败，返回默认图标
                     sendResponse({ favicon: null, error: error.message });
                 }
@@ -368,7 +368,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const data = await response.json();
                 sendResponse({ success: true, translation: data[0][0][0] });
             } catch (error) {
-                console.error('Translation error:', error);
+                // Translation error
                 sendResponse({ success: false, error: error.message });
             }
         })();
@@ -376,14 +376,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'updateApps') {
         try {
             if (!request.apps) {
-                console.warn('No apps provided for updateApps action');
+                // No apps provided for updateApps action
                 sendResponse({ success: false, error: 'No apps provided' });
                 return true;
             }
 
             chrome.storage.local.set({ apps: request.apps }, () => {
                 if (chrome.runtime.lastError) {
-                    console.error('Error saving apps:', chrome.runtime.lastError);
+                    // Error saving apps
                     sendResponse({ success: false, error: chrome.runtime.lastError.message || 'Error saving apps' });
                 } else {
                     sendResponse({ success: true });
@@ -391,13 +391,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
             return true; // 保持消息通道开放，允许异步响应
         } catch (error) {
-            console.error('Error in updateApps:', error);
+            // Error in updateApps
             sendResponse({ success: false, error: error.message || 'Error processing updateApps request' });
             return true;
         }
     }
     } catch (error) {
-        console.error('Error handling message:', error);
+        // Error handling message
         // 如果需要响应，确保发送一个默认响应
         if (request && (request.action === 'getOpenTabs' || request.action === 'getFavicon' || request.action === 'translate')) {
             sendResponse({ error: error.message });
