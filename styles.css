@@ -180,6 +180,27 @@
     animation: duplicate-pulse 0.8s ease-in-out 3;
 }
 
+/* 拖拽目标高亮样式 */
+.app-icon.drag-over {
+    background: rgba(58, 166, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(58, 166, 255, 0.5);
+    transform: scale(1.05);
+    z-index: 20;
+}
+
+.app-icon.app-group.drag-over {
+    background: rgba(58, 166, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(58, 166, 255, 0.6);
+}
+
+/* 分组弹窗中的应用图标高亮 */
+.group-popup .popup-app-icon.drag-over {
+    background: rgba(58, 166, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(58, 166, 255, 0.5);
+    transform: scale(1.1);
+    z-index: 20;
+}
+
 /* 分组相关样式 */
 .app-icon.app-group {
     background: rgba(255, 255, 255, 0.2);
@@ -405,6 +426,18 @@
     z-index: 2147483646;
     pointer-events: none;
     box-shadow: 0 0 4px rgba(58, 166, 255, 0.7);
+    transform: translateY(-50%); /* 确保指示线垂直居中 */
+    border-radius: 1px;
+    animation: glow 1.5s infinite alternate; /* 添加轻微的呼吸效果 */
+}
+
+@keyframes glow {
+    from {
+        box-shadow: 0 0 4px rgba(58, 166, 255, 0.7);
+    }
+    to {
+        box-shadow: 0 0 8px rgba(58, 166, 255, 0.9);
+    }
 }
 
 .context-menu,
