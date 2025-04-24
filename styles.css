@@ -760,3 +760,30 @@
         transform: translateY(-50%) scaleX(1) translateX(0);
     }
 }
+
+/* 自定义悬停提示样式 */
+.sidedock-tooltip {
+    position: fixed;
+    background: rgba(40, 40, 40, 0.95);
+    color: rgba(255, 255, 255, 0.95);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 2147483647;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-50%) translateX(5px);
+    transition: opacity 0.1s ease, transform 0.1s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    white-space: nowrap;
+    will-change: opacity, transform;
+}
+
+.sidedock-tooltip.visible {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}

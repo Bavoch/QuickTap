@@ -275,6 +275,13 @@ class SideDock {
         dropIndicator.style.display = 'none';
         document.body.appendChild(dropIndicator);
 
+        // 创建自定义悬停提示
+        const tooltip = document.createElement('div');
+        tooltip.id = 'sidedock-tooltip';
+        tooltip.className = 'sidedock-tooltip sidedock-extension';
+        tooltip.style.display = 'none';
+        document.body.appendChild(tooltip);
+
         // Create context menu
         this.contextMenu = document.createElement('div');
         this.contextMenu.className = 'context-menu sidedock-extension';
@@ -636,7 +643,9 @@ class SideDock {
         const container = document.createElement('a');
         container.href = app.url;
         container.className = 'app-icon';
-        container.title = app.title;
+        // 禁用浏览器自带的悬停提示
+        container.removeAttribute('title');
+        container.dataset.title = app.title; // 使用自定义属性存储标题
         container.dataset.index = index;
         container.dataset.url = app.url;
         container.draggable = true; // 启用拖拽
@@ -915,6 +924,9 @@ class SideDock {
                     e.dataTransfer.setDragImage(dragImage, 16, 16); // Center image on cursor
                     // Clean up drag image after setting it
                     setTimeout(() => document.body.removeChild(dragImage), 0);
+
+                    // 隐藏悬停提示
+                    this.hideTooltip();
                 });
 
                 // {{edit 2: Modify dragend listener}}
@@ -1277,6 +1289,15 @@ class SideDock {
                     // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
                 });
 
+                // 添加悬停事件处理
+                appIcon.addEventListener('mouseenter', (e) => {
+                    this.showTooltip(e.currentTarget);
+                });
+
+                appIcon.addEventListener('mouseleave', () => {
+                    this.hideTooltip();
+                });
+
                 // 添加到应用列表
                 appList.appendChild(appIcon);
             }
@@ -1512,7 +1533,9 @@ class SideDock {
         children.forEach((child, i) => {
             const appIcon = document.createElement('div');
             appIcon.className = 'popup-app-icon';
-            appIcon.title = child.title;
+            // 禁用浏览器自带的悬停提示
+            appIcon.removeAttribute('title');
+            appIcon.dataset.title = child.title; // 使用自定义属性存储标题
             appIcon.dataset.url = child.url;
             appIcon.dataset.groupIndex = groupIndex;
             appIcon.dataset.childIndex = i;
@@ -1573,6 +1596,9 @@ class SideDock {
                     document.body.removeChild(dragImage);
                     appIcon.classList.add('dragging');
                 }, 0);
+
+                // 隐藏悬停提示
+                this.hideTooltip();
             });
 
             // 添加拖拽经过事件
@@ -1619,6 +1645,15 @@ class SideDock {
                 if (dropIndicator) {
                     dropIndicator.style.display = 'none';
                 }
+            });
+
+            // 添加悬停事件处理
+            appIcon.addEventListener('mouseenter', (e) => {
+                this.showTooltip(e.currentTarget);
+            });
+
+            appIcon.addEventListener('mouseleave', () => {
+                this.hideTooltip();
             });
 
             popup.appendChild(appIcon);
@@ -1820,6 +1855,47 @@ class SideDock {
         if (this.childContextMenu) {
             this.childContextMenu.style.display = 'none';
         }
+    }
+
+    // 显示自定义悬停提示
+    showTooltip(element) {
+        if (!element || this.isDragging) return;
+
+        // 保存当前悬停的元素引用
+        this.currentHoverElement = element;
+
+        const tooltip = document.getElementById('sidedock-tooltip');
+        if (!tooltip) return;
+
+        // 获取图标标题
+        const title = element.dataset.title;
+        if (!title) return;
+
+        // 设置提示内容
+        tooltip.textContent = title;
+        tooltip.style.display = 'block';
+
+        // 计算位置 - 在图标右侧显示
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = `${rect.right + 12}px`;
+        tooltip.style.top = `${rect.top + rect.height/2}px`;
+
+        // 立即添加可见类，触发过渡动画
+        tooltip.classList.add('visible');
+    }
+
+    // 隐藏自定义悬停提示
+    hideTooltip() {
+        // 清除当前悬停元素引用
+        this.currentHoverElement = null;
+
+        const tooltip = document.getElementById('sidedock-tooltip');
+        if (!tooltip) return;
+
+        tooltip.classList.remove('visible');
+
+        // 立即隐藏元素
+        tooltip.style.display = 'none';
     }
 
     // 从分组中移除应用
