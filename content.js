@@ -975,21 +975,37 @@ class SideDock {
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = 'move'; // Indicate moving is allowed
 
+                    // 检查是否有从分组弹窗拖拽过来的应用
+                    const isGroupChildDrag = this.isDraggingFromGroupPopup ||
+                        e.dataTransfer.types.includes('text/plain') &&
+                        e.dataTransfer.getData('text/plain') === 'group-child-drag';
+
+                    // 获取正在拖拽的元素
                     const draggingElement = this.popup?.querySelector('.dragging');
-                    // Ensure we have a dragging element and it's not the element we are hovering over
-                    if (!draggingElement || draggingElement === appIcon) return;
+
+                    // 如果既不是从侧边栏拖拽也不是从分组弹窗拖拽，则退出
+                    if (!draggingElement && !isGroupChildDrag && !this.isDraggingFromGroupPopup) return;
+
+                    // 如果是从侧边栏拖拽，且拖拽到自己，则退出
+                    if (draggingElement && draggingElement === appIcon) return;
 
                     const appListContainer = this.domElements.appList;
                     if(!appListContainer) return;
 
                     // 获取拖拽指示线元素
-                    const dropIndicator = document.getElementById('sidedock-drop-indicator');
-                    if (!dropIndicator) return;
+                    let dropIndicator = document.getElementById('sidedock-drop-indicator');
+                    if (!dropIndicator) {
+                        // 如果不存在，创建一个
+                        dropIndicator = document.createElement('div');
+                        dropIndicator.id = 'sidedock-drop-indicator';
+                        dropIndicator.className = 'drop-indicator';
+                        document.body.appendChild(dropIndicator);
+                    }
 
                     // 移除所有元素的高亮样式
                     const allIcons = this.popup.querySelectorAll('.app-icon');
                     allIcons.forEach(icon => {
-                        if (icon !== draggingElement) {
+                        if (!draggingElement || icon !== draggingElement) {
                             icon.classList.remove('drag-over');
                         }
                     });
@@ -998,7 +1014,7 @@ class SideDock {
                     const afterElement = this.getDragAfterElement(appListContainer, e.clientY);
                     const rect = appIcon.getBoundingClientRect();
                     const isTargetGroup = appIcon.dataset.isGroup === 'true';
-                    const isDraggedGroup = draggingElement.dataset.isGroup === 'true';
+                    const isDraggedGroup = draggingElement ? draggingElement.dataset.isGroup === 'true' : false;
 
                     // 判断是拖拽到图标之间还是拖拽到图标上
                     const mouseY = e.clientY;
@@ -1006,20 +1022,20 @@ class SideDock {
                     const isOnIcon = Math.abs(mouseY - iconMiddle) < rect.height * 0.3; // 在图标中间区域
 
                     // 如果拖拽到图标上，并且是拖拽到分组上或者是普通图标拖到普通图标上（创建分组）
-                    if (isOnIcon && ((isTargetGroup && !isDraggedGroup) || (!isTargetGroup && !isDraggedGroup && draggingElement !== appIcon))) {
+                    if (isOnIcon && ((isTargetGroup && (isGroupChildDrag || !isDraggedGroup)) ||
+                                    (!isTargetGroup && !isDraggedGroup && draggingElement !== appIcon))) {
                         // 高亮目标图标
                         appIcon.classList.add('drag-over');
                         // 隐藏指示线
                         dropIndicator.style.display = 'none';
                     } else {
                         // 拖拽到图标之间，显示指示线
-                        // Perform insert/append only if the position changes
                         if (afterElement) {
                             // 计算指示线位置 - 精确放置在两个元素之间
                             const afterRect = afterElement.getBoundingClientRect();
                             const beforeElement = afterElement.previousElementSibling;
 
-                            if (beforeElement && beforeElement !== draggingElement) {
+                            if (beforeElement && (!draggingElement || beforeElement !== draggingElement)) {
                                 // 如果有前一个元素且不是正在拖拽的元素，放在两个元素之间的中点
                                 const beforeRect = beforeElement.getBoundingClientRect();
                                 const middleY = (beforeRect.bottom + afterRect.top) / 2;
@@ -1036,14 +1052,14 @@ class SideDock {
                                 dropIndicator.style.display = 'block';
                             }
 
-                            // Insert before afterElement only if draggingElement isn't already before it
-                            if(draggingElement.nextSibling !== afterElement){
+                            // 如果是从侧边栏拖拽，则移动元素
+                            if (draggingElement && draggingElement.nextSibling !== afterElement) {
                                 appListContainer.insertBefore(draggingElement, afterElement);
                             }
                         } else {
                             // 如果是拖到最后，指示线放在最后一个元素下方
                             const lastElement = appListContainer.lastElementChild;
-                            if (lastElement && lastElement !== draggingElement) {
+                            if (lastElement && (!draggingElement || lastElement !== draggingElement)) {
                                 const lastRect = lastElement.getBoundingClientRect();
                                 dropIndicator.style.width = `${rect.width}px`;
                                 dropIndicator.style.left = `${rect.left}px`;
@@ -1051,8 +1067,8 @@ class SideDock {
                                 dropIndicator.style.display = 'block';
                             }
 
-                            // Append to end only if draggingElement isn't already the last child
-                            if(appListContainer.lastElementChild !== draggingElement){
+                            // 如果是从侧边栏拖拽，则移动元素
+                            if (draggingElement && appListContainer.lastElementChild !== draggingElement) {
                                 appListContainer.appendChild(draggingElement);
                             }
                         }
@@ -1076,9 +1092,10 @@ class SideDock {
                     }
 
                     // 处理从分组弹窗拖拽过来的应用
-                    if (dragData && dragData.type === 'group-child') {
+                    if ((dragData && dragData.type === 'group-child') || this.isDraggingFromGroupPopup) {
                         // 从分组弹窗拖拽过来的应用
-                        const { groupIndex, childIndex } = dragData;
+                        const groupIndex = dragData ? dragData.groupIndex : this.draggingGroupIndex;
+                        const childIndex = dragData ? dragData.childIndex : this.draggingChildIndex;
                         const targetIndex = parseInt(appIcon.dataset.index);
 
                         // 获取原始应用数据
@@ -1117,6 +1134,17 @@ class SideDock {
                                         }
                                     });
                                 });
+
+                                // 重置拖拽状态
+                                this.isDraggingFromGroupPopup = false;
+                                this.draggingGroupIndex = null;
+                                this.draggingChildIndex = null;
+
+                                // 隐藏拖拽指示线
+                                const dropIndicator = document.getElementById('sidedock-drop-indicator');
+                                if (dropIndicator) {
+                                    dropIndicator.style.display = 'none';
+                                }
 
                                 // 重新加载应用列表
                                 this.loadApps();
@@ -1714,6 +1742,11 @@ class SideDock {
                 e.stopPropagation();
                 this.isDragging = true;
 
+                // 设置全局标志，表示正在从分组弹窗拖拽
+                this.isDraggingFromGroupPopup = true;
+                this.draggingGroupIndex = groupIndex;
+                this.draggingChildIndex = i;
+
                 // 设置拖拽数据：分组索引和子应用索引
                 const dragData = JSON.stringify({
                     type: 'group-child',
@@ -1721,6 +1754,7 @@ class SideDock {
                     childIndex: i
                 });
                 e.dataTransfer.setData('application/json', dragData);
+                e.dataTransfer.setData('text/plain', 'group-child-drag'); // 添加一个简单的标识，便于检测
                 e.dataTransfer.effectAllowed = 'move';
 
                 // 设置拖拽图像
@@ -1738,6 +1772,15 @@ class SideDock {
                 setTimeout(() => {
                     document.body.removeChild(dragImage);
                     appIcon.classList.add('dragging');
+
+                    // 确保拖拽指示线存在
+                    let dropIndicator = document.getElementById('sidedock-drop-indicator');
+                    if (!dropIndicator) {
+                        dropIndicator = document.createElement('div');
+                        dropIndicator.id = 'sidedock-drop-indicator';
+                        dropIndicator.className = 'drop-indicator';
+                        document.body.appendChild(dropIndicator);
+                    }
                 }, 0);
 
                 // 隐藏悬停提示
@@ -1769,6 +1812,9 @@ class SideDock {
             // 添加拖拽结束事件
             appIcon.addEventListener('dragend', () => {
                 this.isDragging = false;
+                this.isDraggingFromGroupPopup = false;
+                this.draggingGroupIndex = null;
+                this.draggingChildIndex = null;
                 appIcon.classList.remove('dragging');
 
                 // 清除所有高亮样式
