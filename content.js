@@ -346,6 +346,17 @@ class SideDock {
         this.domElements.iconContextMenu = this.editModal.querySelector('.icon-context-menu');
         this.domElements.iconUpload = this.editModal.querySelector('#iconUpload');
 
+        // 为输入框添加键盘事件处理，阻止 Control+A 等快捷键冒泡到文档
+        this.handleInputKeydown = (e) => {
+            // 如果是 Control+A，阻止事件冒泡，让浏览器默认行为只在输入框内生效
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                e.stopPropagation();
+            }
+        };
+
+        // 设置输入框键盘事件处理器
+        this.setupInputKeydownHandlers();
+
         // Add click event listener to close popup when clicking outside
         document.addEventListener('click', (e) => {
             // 检查是否有右键菜单显示
@@ -712,12 +723,7 @@ class SideDock {
         container.style.position = 'relative';
         container.appendChild(indicator);
 
-        // 如果是分组，添加分组指示器
-        if (app.isGroup) {
-            const groupIndicator = document.createElement('div');
-            groupIndicator.className = 'group-indicator';
-            container.appendChild(groupIndicator);
-        }
+
 
         // 右键菜单
         container.addEventListener('contextmenu', (e) => {
@@ -1181,7 +1187,7 @@ class SideDock {
 
                         // 创建新分组
                         const newGroup = {
-                            title: `分组 ${targetApp.title}`,
+                            title: "未命名",
                             url: targetApp.url, // 使用目标应用的URL作为分组URL
                             favicon: targetApp.favicon, // 使用目标应用的图标作为分组图标
                             isGroup: true,
@@ -1464,20 +1470,35 @@ class SideDock {
 
         // 如果是分组，显示分组特有的菜单项
         if (isGroup) {
-            // 确保分组菜单项存在
+            // 确保"打开全部"菜单项存在
+            if (!this.contextMenu.querySelector('.open-all')) {
+                const openAllItem = document.createElement('div');
+                openAllItem.className = 'context-menu-item open-all';
+                openAllItem.innerHTML = '<span>打开全部</span>';
+                openAllItem.addEventListener('click', () => this.handleOpenAllApps());
+                this.contextMenu.appendChild(openAllItem);
+            }
+
+            // 确保"解除分组"菜单项存在
             if (!this.contextMenu.querySelector('.ungroup')) {
                 const ungroupItem = document.createElement('div');
                 ungroupItem.className = 'context-menu-item ungroup';
-                ungroupItem.innerHTML = '<span>解散分组</span>';
+                ungroupItem.innerHTML = '<span>解除分组</span>';
                 ungroupItem.addEventListener('click', () => this.handleUngroup());
                 this.contextMenu.appendChild(ungroupItem);
             }
 
-            // 显示解散分组选项
+            // 显示分组特有的选项
+            const openAllItem = this.contextMenu.querySelector('.open-all');
+            if (openAllItem) openAllItem.style.display = 'flex';
+
             const ungroupItem = this.contextMenu.querySelector('.ungroup');
             if (ungroupItem) ungroupItem.style.display = 'flex';
         } else {
-            // 隐藏解散分组选项
+            // 隐藏分组特有的选项
+            const openAllItem = this.contextMenu.querySelector('.open-all');
+            if (openAllItem) openAllItem.style.display = 'none';
+
             const ungroupItem = this.contextMenu.querySelector('.ungroup');
             if (ungroupItem) ungroupItem.style.display = 'none';
         }
@@ -1514,6 +1535,103 @@ class SideDock {
         }
     }
 
+    // 处理打开分组中所有应用
+    async handleOpenAllApps() {
+        try {
+            // 隐藏右键菜单
+            this.contextMenu.style.display = 'none';
+
+            // 获取当前应用列表
+            const apps = await this.getApps();
+
+            // 确保索引有效
+            if (this.currentAppIndex === null || this.currentAppIndex < 0 || this.currentAppIndex >= apps.length) {
+                return;
+            }
+
+            // 获取当前分组
+            const group = apps[this.currentAppIndex];
+
+            // 确保是分组
+            if (!group || !group.isGroup || !group.children || !group.children.length) {
+                return;
+            }
+
+            // 打开分组中的所有应用
+            const openPromises = group.children.map(child => {
+                return new Promise(resolve => {
+                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                        chrome.runtime.sendMessage({ action: 'switchOrOpenUrl', url: child.url }, () => {
+                            if (chrome.runtime.lastError) {
+                                window.open(child.url, '_blank');
+                            }
+                            resolve();
+                        });
+                    } else {
+                        window.open(child.url, '_blank');
+                        resolve();
+                    }
+                });
+            });
+
+            // 等待所有应用打开完成
+            await Promise.all(openPromises);
+
+            // 隐藏分组弹窗（如果存在）
+            this.hideGroupPopup();
+
+        } catch (error) {
+            // Error handling open all apps
+        }
+    }
+
+    // 处理解除分组
+    async handleUngroup() {
+        try {
+            // 隐藏右键菜单
+            this.contextMenu.style.display = 'none';
+
+            // 获取当前应用列表
+            const apps = await this.getApps();
+
+            // 确保索引有效
+            if (this.currentAppIndex === null || this.currentAppIndex < 0 || this.currentAppIndex >= apps.length) {
+                return;
+            }
+
+            // 获取当前分组
+            const group = apps[this.currentAppIndex];
+
+            // 确保是分组
+            if (!group || !group.isGroup || !group.children || !group.children.length) {
+                return;
+            }
+
+            // 从应用列表中移除分组
+            apps.splice(this.currentAppIndex, 1);
+
+            // 将分组中的应用添加到应用列表中
+            apps.splice(this.currentAppIndex, 0, ...group.children);
+
+            // 保存更新后的应用列表
+            await new Promise((resolve, reject) => {
+                chrome.storage.local.set({ apps }, () => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                        return;
+                    }
+                    resolve();
+                });
+            });
+
+            // 隐藏分组弹窗（如果存在）
+            this.hideGroupPopup();
+
+        } catch (error) {
+            // Error handling ungroup
+        }
+    }
+
     // 显示分组弹窗
     showGroupPopup(groupIcon, children) {
         // 隐藏已存在的弹窗
@@ -1540,6 +1658,11 @@ class SideDock {
             appIcon.dataset.groupIndex = groupIndex;
             appIcon.dataset.childIndex = i;
             appIcon.draggable = true; // 启用拖拽
+
+            // 添加活跃指示器
+            const activeIndicator = document.createElement('div');
+            activeIndicator.className = 'active-indicator';
+            appIcon.appendChild(activeIndicator);
 
             const img = document.createElement('img');
             img.alt = child.title;
@@ -1647,6 +1770,13 @@ class SideDock {
                 }
             });
 
+            // 添加右键菜单事件
+            appIcon.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.showPopupAppContextMenu(e, groupIndex, i);
+            });
+
             // 添加悬停事件处理
             appIcon.addEventListener('mouseenter', (e) => {
                 this.showTooltip(e.currentTarget);
@@ -1666,6 +1796,7 @@ class SideDock {
         // 设置弹窗位置
         popup.style.left = `${popupLeft}px`;
         popup.style.top = `${popupTop}px`;
+        popup.style.zIndex = '2147483646'; // 确保z-index保持一致
 
         // 添加到文档
         document.body.appendChild(popup);
@@ -1857,6 +1988,237 @@ class SideDock {
         }
     }
 
+    // 显示分组弹窗中应用图标的上下文菜单
+    showPopupAppContextMenu(e, groupIndex, childIndex) {
+        e.preventDefault();
+        const rect = e.target.getBoundingClientRect();
+
+        // 确保上下文菜单存在
+        if (!this.popupAppContextMenu) {
+            this.popupAppContextMenu = document.createElement('div');
+            this.popupAppContextMenu.className = 'context-menu popup-app-context-menu sidedock-extension';
+            this.popupAppContextMenu.innerHTML = `
+                <div class="context-menu-item edit">
+                    <span>编辑</span>
+                </div>
+                <div class="context-menu-item delete">
+                    <span>删除</span>
+                </div>
+                <div class="context-menu-item remove-from-group">
+                    <span>从分组中移除</span>
+                </div>
+            `;
+            document.body.appendChild(this.popupAppContextMenu);
+
+            // 添加编辑事件
+            this.popupAppContextMenu.querySelector('.edit').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.hidePopupAppContextMenu();
+                // 延迟执行编辑操作，确保右键菜单已经隐藏
+                setTimeout(() => {
+                    this.handlePopupAppEdit();
+                }, 10);
+            });
+
+            // 添加删除事件
+            this.popupAppContextMenu.querySelector('.delete').addEventListener('click', () => {
+                this.handlePopupAppDelete();
+                this.hidePopupAppContextMenu();
+            });
+
+            // 添加从分组中移除事件
+            this.popupAppContextMenu.querySelector('.remove-from-group').addEventListener('click', () => {
+                this.removeFromGroup(this.currentGroupIndex, this.currentChildIndex);
+                this.hidePopupAppContextMenu();
+                this.hideGroupPopup();
+            });
+        }
+
+        // 保存当前分组索引和子应用索引
+        this.currentGroupIndex = groupIndex;
+        this.currentChildIndex = childIndex;
+
+        // 显示上下文菜单
+        this.popupAppContextMenu.style.display = 'block';
+        this.popupAppContextMenu.style.zIndex = '2147483648'; // 确保右键菜单始终在最顶层
+
+        // 确保菜单显示在可见区域内
+
+        // 计算右键菜单的位置
+        // 如果右侧空间不足，则显示在左侧
+        const rightSpace = window.innerWidth - rect.right;
+        const menuWidth = this.popupAppContextMenu.offsetWidth || 120; // 估计宽度
+
+        if (rightSpace < menuWidth + 20) {
+            // 右侧空间不足，显示在左侧
+            this.popupAppContextMenu.style.left = `${rect.left - menuWidth - 8}px`;
+        } else {
+            // 右侧空间足够，显示在右侧
+            this.popupAppContextMenu.style.left = `${rect.right + 8}px`;
+        }
+
+        // 计算垂直位置，确保菜单不会超出屏幕底部
+        const menuHeight = this.popupAppContextMenu.offsetHeight || 100; // 估计高度
+        let topPosition = rect.top;
+
+        if (topPosition + menuHeight > window.innerHeight) {
+            // 如果菜单会超出屏幕底部，则向上调整位置
+            topPosition = window.innerHeight - menuHeight - 10;
+        }
+
+        this.popupAppContextMenu.style.top = `${topPosition}px`;
+
+        // 添加点击外部关闭菜单的事件
+        setTimeout(() => {
+            document.addEventListener('click', this.handlePopupAppContextMenuDocumentClick);
+        }, 0);
+    }
+
+    // 隐藏分组弹窗中应用图标的上下文菜单
+    hidePopupAppContextMenu() {
+        if (this.popupAppContextMenu) {
+            this.popupAppContextMenu.style.display = 'none';
+            document.removeEventListener('click', this.handlePopupAppContextMenuDocumentClick);
+        }
+    }
+
+    // 处理文档点击事件（用于关闭分组弹窗中应用图标的上下文菜单）
+    handlePopupAppContextMenuDocumentClick = (e) => {
+        const isContextMenu = e.target.closest('.popup-app-context-menu');
+        if (this.popupAppContextMenu && !isContextMenu) {
+            this.hidePopupAppContextMenu();
+        }
+    }
+
+    // 处理分组弹窗中应用图标的编辑
+    async handlePopupAppEdit() {
+        try {
+            const apps = await this.getApps();
+            const group = apps[this.currentGroupIndex];
+
+            // 确保是分组且有子应用
+            if (!group || !group.isGroup || !group.children || this.currentChildIndex >= group.children.length) {
+                return;
+            }
+
+            // 获取子应用
+            const child = group.children[this.currentChildIndex];
+
+            // 设置当前应用索引为临时值，表示正在编辑分组中的子应用
+            this.currentAppIndex = -1;
+            this.currentEditingGroupApp = {
+                groupIndex: this.currentGroupIndex,
+                childIndex: this.currentChildIndex,
+                app: child
+            };
+
+            // 获取当前图标的位置
+            const currentIcon = this.groupPopup ? this.groupPopup.querySelector(`.popup-app-icon[data-child-index="${this.currentChildIndex}"]`) : null;
+            if (!currentIcon) {
+                // 如果找不到图标，使用默认位置
+                console.log('找不到分组弹窗中的图标，使用默认位置');
+                const iconRect = { top: window.innerHeight / 2 - 100, right: window.innerWidth / 2 - 100 };
+                this.editModal.style.position = 'fixed';
+                this.editModal.style.top = `${iconRect.top}px`;
+                this.editModal.style.left = `${iconRect.right + 8}px`;
+                this.editModal.style.transform = 'none';
+                this.editModal.style.zIndex = '2147483648'; // 确保编辑弹窗在最顶层
+                this.editModal.style.display = 'block';
+                return;
+            }
+            const iconRect = currentIcon.getBoundingClientRect();
+
+            const iconImg = this.domElements.editAppIconImg;
+            const titleInput = this.domElements.editTitle;
+            const urlInput = this.domElements.editUrl;
+
+            // 设置编辑表单的值
+            titleInput.value = child.title;
+            urlInput.value = child.url;
+
+            // 设置图标
+            if (child.favicon && child.favicon !== 'null' && child.favicon !== 'undefined') {
+                iconImg.src = child.favicon;
+            } else {
+                const favicon = await this.getFaviconFromUrl(child.url);
+                iconImg.src = favicon;
+            }
+
+            // 显示URL输入框和图标编辑区域
+            urlInput.style.display = 'block';
+            const iconContainer = this.editModal.querySelector('.edit-app-icon');
+            if (iconContainer) {
+                iconContainer.style.display = 'flex';
+            }
+
+            // 设置标题
+            this.editModal.querySelector('.header h3').textContent = '编辑应用';
+
+            // 设置弹窗位置
+            this.editModal.style.position = 'fixed';
+            this.editModal.style.top = `${iconRect.top}px`;
+            this.editModal.style.left = `${iconRect.right + 8}px`;
+            this.editModal.style.transform = 'none';
+            this.editModal.style.zIndex = '2147483648'; // 确保编辑弹窗在最顶层
+
+            // 显示编辑弹窗
+            this.editModal.style.display = 'block';
+
+            // 隐藏右键菜单
+            if (this.popupAppContextMenu) {
+                this.popupAppContextMenu.style.display = 'none';
+            }
+
+            // 确保输入框有键盘事件监听器
+            this.setupInputKeydownHandlers();
+        } catch (error) {
+            // Error handling popup app edit
+        }
+    }
+
+    // 处理分组弹窗中应用图标的删除
+    async handlePopupAppDelete() {
+        try {
+            const apps = await this.getApps();
+            const group = apps[this.currentGroupIndex];
+
+            // 确保是分组且有子应用
+            if (!group || !group.isGroup || !group.children || this.currentChildIndex >= group.children.length) {
+                return;
+            }
+
+            // 从分组中移除子应用
+            group.children.splice(this.currentChildIndex, 1);
+
+            // 如果分组为空，移除分组标记
+            if (group.children.length === 0) {
+                delete group.children;
+                delete group.isGroup;
+                delete group.collapsed;
+            }
+
+            // 保存更改
+            await new Promise((resolve, reject) => {
+                chrome.storage.local.set({ apps }, () => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+
+            // 隐藏分组弹窗
+            this.hideGroupPopup();
+
+            // 重新加载应用列表
+            this.loadApps();
+        } catch (error) {
+            // Error handling popup app delete
+        }
+    }
+
     // 显示自定义悬停提示
     showTooltip(element) {
         if (!element || this.isDragging) return;
@@ -1874,11 +2236,27 @@ class SideDock {
         // 设置提示内容
         tooltip.textContent = title;
         tooltip.style.display = 'block';
+        tooltip.style.zIndex = '2147483648'; // 确保tooltip始终在最顶层
 
-        // 计算位置 - 在图标右侧显示
+        // 计算位置
         const rect = element.getBoundingClientRect();
-        tooltip.style.left = `${rect.right + 12}px`;
-        tooltip.style.top = `${rect.top + rect.height/2}px`;
+
+        // 检查是否是分组弹窗中的图标
+        const isInGroupPopup = element.closest('.group-popup') !== null;
+
+        if (isInGroupPopup) {
+            // 如果是分组弹窗中的图标，将提示显示在图标下方
+            tooltip.style.left = `${rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2)}px`;
+            tooltip.style.top = `${rect.bottom + 8}px`;
+            // 添加特殊类，用于CSS样式调整
+            tooltip.classList.add('group-popup-tooltip');
+        } else {
+            // 如果是侧边栏中的图标，将提示显示在图标右侧
+            tooltip.style.left = `${rect.right + 12}px`;
+            tooltip.style.top = `${rect.top + rect.height/2}px`;
+            // 移除特殊类
+            tooltip.classList.remove('group-popup-tooltip');
+        }
 
         // 立即添加可见类，触发过渡动画
         tooltip.classList.add('visible');
@@ -2010,79 +2388,112 @@ class SideDock {
         const iconRect = currentIcon.getBoundingClientRect();
 
         const iconImg = this.domElements.editAppIconImg;
-        iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
-        // 使用保存的图标或获取新图标
-        if (app.favicon && app.favicon !== 'null' && app.favicon !== 'undefined') {
-            iconImg.src = app.favicon;
-        } else {
-            const favicon = await this.getFaviconFromUrl(app.url);
-            iconImg.src = favicon;
-        }
-
         const titleInput = this.domElements.editTitle;
         const urlInput = this.domElements.editUrl;
 
         titleInput.value = app.title;
         urlInput.value = app.url;
 
-        // 移除旧的事件监听器
-        if (urlInput._urlChangeHandler) {
-            urlInput.removeEventListener('input', urlInput._urlChangeHandler);
-        }
+        // 检查是否是分组
+        const isGroup = app.isGroup === true;
 
-        // 添加新的 URL 输入事件监听器
-        let timeoutId = null;
-        let lastDomain = '';  // 用于跟踪域名变化
+        // 如果是分组，隐藏URL输入框和图标编辑区域，只允许编辑分组名称
+        if (isGroup) {
+            urlInput.style.display = 'none';
+            this.editModal.querySelector('.header h3').textContent = '编辑分组';
+            // 确保名称输入框可见
+            titleInput.style.display = 'block';
+            titleInput.style.width = '100%';
 
-        urlInput._urlChangeHandler = async () => {
-            // 清除之前的定时器
-            if (timeoutId) {
-                clearTimeout(timeoutId);
+            // 隐藏图标编辑区域
+            const iconContainer = this.editModal.querySelector('.edit-app-icon');
+            if (iconContainer) {
+                iconContainer.style.display = 'none';
             }
 
-            const url = this.autoCompleteUrl(urlInput.value.trim());
-            if (!url) {
-                iconImg.src = this.generateDefaultIcon(titleInput.value);
-                return;
+            // 使用保存的图标
+            if (app.favicon && app.favicon !== 'null' && app.favicon !== 'undefined') {
+                iconImg.src = app.favicon;
+            }
+        } else {
+            urlInput.style.display = 'block';
+            this.editModal.querySelector('.header h3').textContent = '编辑应用';
+
+            // 显示图标编辑区域
+            const iconContainer = this.editModal.querySelector('.edit-app-icon');
+            if (iconContainer) {
+                iconContainer.style.display = 'flex';
             }
 
-            try {
-                // 获取新的域名
-                const newDomain = new URL(url).hostname;
+            // 使用保存的图标或获取新图标
+            if (app.favicon && app.favicon !== 'null' && app.favicon !== 'undefined') {
+                iconImg.src = app.favicon;
+            } else {
+                const favicon = await this.getFaviconFromUrl(app.url);
+                iconImg.src = favicon;
+            }
 
-                // 如果域名没有变化，且已经有图标，则不需要更新
-                if (newDomain === lastDomain && iconImg.src && !iconImg.src.startsWith('data:image/png;base64,iVBOR')) {
+            iconImg.addEventListener('error', () => this.handleImageError(iconImg, app.title, this.currentAppIndex));
+
+            // 移除旧的事件监听器
+            if (urlInput._urlChangeHandler) {
+                urlInput.removeEventListener('input', urlInput._urlChangeHandler);
+            }
+
+            // 添加新的 URL 输入事件监听器
+            let timeoutId = null;
+            let lastDomain = '';  // 用于跟踪域名变化
+
+            urlInput._urlChangeHandler = async () => {
+                // 清除之前的定时器
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+
+                const url = this.autoCompleteUrl(urlInput.value.trim());
+                if (!url) {
+                    iconImg.src = this.generateDefaultIcon(titleInput.value);
                     return;
                 }
 
-                // 设置 1 秒的延迟
-                timeoutId = setTimeout(async () => {
-                    try {
-                        // 显示加载状态
-                        iconImg.style.opacity = '0.5';
+                try {
+                    // 获取新的域名
+                    const newDomain = new URL(url).hostname;
 
-                        // 更新最后的域名
-                        lastDomain = newDomain;
-
-                        // 获取新图标
-                        const favicon = await this.getFaviconFromUrl(url);
-                        iconImg.src = favicon;
-                    } catch (error) {
-                        // Error fetching favicon
-                        iconImg.src = this.generateDefaultIcon(titleInput.value);
-                    } finally {
-                        iconImg.style.opacity = '1';
+                    // 如果域名没有变化，且已经有图标，则不需要更新
+                    if (newDomain === lastDomain && iconImg.src && !iconImg.src.startsWith('data:image/png;base64,iVBOR')) {
+                        return;
                     }
-                }, 1000); // 1秒延迟
-            } catch (error) {
-                // Invalid URL
-                iconImg.src = this.generateDefaultIcon(titleInput.value);
-            }
-        };
 
-        // 同时监听 input 和 change 事件
-        urlInput.addEventListener('input', urlInput._urlChangeHandler);
-        urlInput.addEventListener('change', urlInput._urlChangeHandler);
+                    // 设置 1 秒的延迟
+                    timeoutId = setTimeout(async () => {
+                        try {
+                            // 显示加载状态
+                            iconImg.style.opacity = '0.5';
+
+                            // 更新最后的域名
+                            lastDomain = newDomain;
+
+                            // 获取新图标
+                            const favicon = await this.getFaviconFromUrl(url);
+                            iconImg.src = favicon;
+                        } catch (error) {
+                            // Error fetching favicon
+                            iconImg.src = this.generateDefaultIcon(titleInput.value);
+                        } finally {
+                            iconImg.style.opacity = '1';
+                        }
+                    }, 1000); // 1秒延迟
+                } catch (error) {
+                    // Invalid URL
+                    iconImg.src = this.generateDefaultIcon(titleInput.value);
+                }
+            };
+
+            // 同时监听 input 和 change 事件
+            urlInput.addEventListener('input', urlInput._urlChangeHandler);
+            urlInput.addEventListener('change', urlInput._urlChangeHandler);
+        }
 
         // 设置弹窗位置在图标右侧8px处，并且顶部对齐
         this.editModal.style.position = 'fixed';
@@ -2092,6 +2503,9 @@ class SideDock {
 
         this.editModal.style.display = 'block';
         this.contextMenu.style.display = 'none';
+
+        // 确保输入框有键盘事件监听器
+        this.setupInputKeydownHandlers();
     }
 
     hideEditModal() {
@@ -2102,8 +2516,39 @@ class SideDock {
             urlInput.removeEventListener('input', urlInput._urlChangeHandler);
             urlInput._urlChangeHandler = null;
         }
+
+        // 重置输入框的显示状态
+        if (urlInput) {
+            urlInput.style.display = 'block';
+            // 移除键盘事件监听器
+            urlInput.removeEventListener('keydown', this.handleInputKeydown);
+        }
+
+        // 重置标题输入框的样式
+        const titleInput = this.domElements.editTitle;
+        if (titleInput) {
+            titleInput.style.width = '';
+            // 移除键盘事件监听器
+            titleInput.removeEventListener('keydown', this.handleInputKeydown);
+        }
+
+        // 重置图标编辑区域的显示状态
+        const iconContainer = this.editModal.querySelector('.edit-app-icon');
+        if (iconContainer) {
+            iconContainer.style.display = 'flex';
+        }
+
+        // 重置标题
+        const headerTitle = this.editModal.querySelector('.header h3');
+        if (headerTitle) {
+            headerTitle.textContent = '编辑应用';
+        }
+
         // 清除 currentAppIndex
         this.currentAppIndex = null;
+
+        // 清除当前编辑的分组应用
+        this.currentEditingGroupApp = null;
     }
 
     async handleDelete() {
@@ -2176,19 +2621,6 @@ class SideDock {
             const iconImg = this.domElements.editAppIconImg;
 
             const title = titleInput.value.trim();
-            let url = urlInput.value.trim();
-
-            if (!title || !url) {
-                // Title and URL are required
-                return;
-            }
-
-            // 自动补全 URL
-            url = this.autoCompleteUrl(url);
-            // Saving app
-
-            // 获取当前显示的图标
-            const favicon = iconImg.src;
 
             // 检查chrome API是否可用
             if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
@@ -2214,24 +2646,95 @@ class SideDock {
                     }
                 });
 
-                // Current apps count
+                // 检查是否正在编辑分组弹窗中的应用
+                if (this.currentEditingGroupApp) {
+                    const { groupIndex, childIndex } = this.currentEditingGroupApp;
 
-                // 准备新的应用对象
-                const appData = {
-                    title,
-                    url,
-                    favicon  // 使用当前显示的图标
-                };
+                    // 确保分组索引有效
+                    if (groupIndex < 0 || groupIndex >= apps.length) {
+                        return;
+                    }
 
-                // 更新或添加应用
-                if (this.currentAppIndex !== null && this.currentAppIndex >= 0 && this.currentAppIndex < apps.length) {
-                    // 更新现有应用
-                    // Updating existing app at index
-                    apps[this.currentAppIndex] = appData;
+                    // 获取分组
+                    const group = apps[groupIndex];
+
+                    // 确保是分组且子应用索引有效
+                    if (!group || !group.isGroup || !group.children || childIndex < 0 || childIndex >= group.children.length) {
+                        return;
+                    }
+
+                    // 获取子应用
+                    const child = group.children[childIndex];
+
+                    // 更新子应用数据
+                    let url = urlInput.value.trim();
+                    if (!title || !url) {
+                        // Title and URL are required
+                        return;
+                    }
+
+                    // 自动补全 URL
+                    url = this.autoCompleteUrl(url);
+
+                    // 获取当前显示的图标
+                    const favicon = iconImg.src;
+
+                    // 更新子应用数据
+                    child.title = title;
+                    child.url = url;
+                    if (favicon) {
+                        child.favicon = favicon;
+                    }
+
+                    // 清除当前编辑的分组应用
+                    this.currentEditingGroupApp = null;
                 } else {
-                    // 添加新应用
-                    // Adding new app
-                    apps.push(appData);
+                    // 正常编辑侧边栏中的应用
+
+                    // 确保索引有效
+                    if (this.currentAppIndex === null || this.currentAppIndex < 0 || this.currentAppIndex >= apps.length) {
+                        // Invalid app index
+                        return;
+                    }
+
+                    // 获取当前应用
+                    const currentApp = apps[this.currentAppIndex];
+
+                    // 检查是否是分组
+                    const isGroup = currentApp.isGroup === true;
+
+                    if (isGroup) {
+                        // 如果是分组，只更新标题
+                        if (!title) {
+                            // 分组名称不能为空
+                            return;
+                        }
+
+                        // 更新分组名称
+                        currentApp.title = title;
+
+                        // 分组不需要更新图标
+                    } else {
+                        // 如果是普通应用，需要URL
+                        let url = urlInput.value.trim();
+                        if (!title || !url) {
+                            // Title and URL are required
+                            return;
+                        }
+
+                        // 自动补全 URL
+                        url = this.autoCompleteUrl(url);
+
+                        // 获取当前显示的图标
+                        const favicon = iconImg.src;
+
+                        // 更新应用数据
+                        currentApp.title = title;
+                        currentApp.url = url;
+                        if (favicon) {
+                            currentApp.favicon = favicon;
+                        }
+                    }
                 }
 
                 // 保存更新后的应用列表
@@ -2255,6 +2758,19 @@ class SideDock {
 
                 // 隐藏编辑模态框
                 this.hideEditModal();
+
+                // 如果分组弹窗存在，重新显示
+                if (this.groupPopup) {
+                    // 重新加载分组弹窗
+                    const groupIcon = this.popup.querySelector(`.app-icon[data-index="${this.currentGroupIndex}"]`);
+                    if (groupIcon) {
+                        const group = apps[this.currentGroupIndex];
+                        if (group && group.isGroup && group.children) {
+                            this.hideGroupPopup();
+                            this.showGroupPopup(groupIcon, group.children);
+                        }
+                    }
+                }
 
                 // 不需要手动重新加载，因为 storage 变更会触发自动重新加载
                 // Edit saved, waiting for automatic reload
@@ -2826,6 +3342,20 @@ class SideDock {
             }, 500); // 0.5秒延迟
         } else {
             // triggerZone not found in hide()
+        }
+    }
+
+    // 设置输入框键盘事件处理器
+    setupInputKeydownHandlers() {
+        // 移除可能存在的旧事件监听器
+        if (this.domElements.editTitle) {
+            this.domElements.editTitle.removeEventListener('keydown', this.handleInputKeydown);
+            this.domElements.editTitle.addEventListener('keydown', this.handleInputKeydown);
+        }
+
+        if (this.domElements.editUrl) {
+            this.domElements.editUrl.removeEventListener('keydown', this.handleInputKeydown);
+            this.domElements.editUrl.addEventListener('keydown', this.handleInputKeydown);
         }
     }
 
