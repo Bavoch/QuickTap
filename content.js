@@ -735,7 +735,15 @@ class SideDock {
             // 如果是分组，则展开/折叠
             if (app.isGroup) {
                 e.preventDefault(); // 阻止默认的链接跳转行为
-                this.toggleGroup(index);
+                e.stopPropagation(); // 阻止事件冒泡
+
+                // 如果分组弹窗已经显示，则关闭它
+                if (this.groupPopup) {
+                    this.hideGroupPopup();
+                } else {
+                    // 否则显示分组弹窗
+                    this.toggleGroup(index);
+                }
             } else {
                 // 如果是普通应用，则打开链接
                 e.preventDefault();
@@ -1512,6 +1520,9 @@ class SideDock {
     // 切换分组的展开/折叠状态
     async toggleGroup(index) {
         try {
+            // 立即隐藏任何可能显示的提示
+            this.hideTooltip();
+
             const apps = await this.getApps();
             const app = apps[index];
 
@@ -1524,6 +1535,12 @@ class SideDock {
             // 获取分组图标
             const groupIcon = this.popup.querySelector(`.app-icon[data-index="${index}"]`);
             if (!groupIcon) return;
+
+            // 如果已经有分组弹窗显示，则关闭它
+            if (this.groupPopup) {
+                this.hideGroupPopup();
+                return;
+            }
 
             // 显示分组弹窗
             if (app.children && app.children.length > 0) {
@@ -1636,6 +1653,9 @@ class SideDock {
     showGroupPopup(groupIcon, children) {
         // 隐藏已存在的弹窗
         this.hideGroupPopup();
+
+        // 隐藏任何可能显示的提示
+        this.hideTooltip();
 
         // 获取分组图标的位置
         const rect = groupIcon.getBoundingClientRect();
@@ -1823,11 +1843,16 @@ class SideDock {
 
     // 处理文档点击事件
     handleDocumentClick = (e) => {
-        // 如果点击的不是弹窗或其子元素，也不是分组图标，则关闭弹窗
-        const isGroupIcon = e.target.closest('.app-icon.app-group');
-        const isPopupOrChild = this.groupPopup && this.groupPopup.contains(e.target);
+        // 如果没有分组弹窗，不需要处理
+        if (!this.groupPopup) return;
 
-        if (this.groupPopup && !isPopupOrChild && !isGroupIcon) {
+        // 检查点击是否在弹窗内
+        const isPopupOrChild = this.groupPopup.contains(e.target);
+
+        // 如果点击不在弹窗内，关闭弹窗
+        if (!isPopupOrChild) {
+            // 阻止事件冒泡，防止触发其他点击事件
+            e.stopPropagation();
             this.hideGroupPopup();
         }
     }
@@ -2221,7 +2246,8 @@ class SideDock {
 
     // 显示自定义悬停提示
     showTooltip(element) {
-        if (!element || this.isDragging) return;
+        // 如果元素不存在、正在拖拽或分组弹窗已打开，不显示提示
+        if (!element || this.isDragging || this.groupPopup) return;
 
         // 保存当前悬停的元素引用
         this.currentHoverElement = element;
