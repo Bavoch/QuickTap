@@ -171,11 +171,6 @@
     filter: brightness(0.8);
 }
 
-/* 移除重复的光标样式定义，使用上面定义的pointer样式 */
-.app-icon.dragging {
-    cursor: grabbing;
-}
-
 .app-icon.duplicate-highlight {
     animation: duplicate-pulse 0.8s ease-in-out 3;
 }
@@ -301,7 +296,7 @@
 /* 分组弹窗 */
 .group-popup {
     position: fixed;
-    width: 176px; /* 固定宽度 */
+    width: 64px; /* 单列宽度，与侧边栏宽度一致 */
     height: auto; /* 自适应高度 */
     max-height: 300px; /* 最大高度 */
     padding: 12px; /* p-3 = 12px */
@@ -312,11 +307,11 @@
     outline-offset: -1px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    display: inline-flex;
+    display: flex;
+    flex-direction: column; /* 改为纵向排列 */
     justify-content: flex-start;
-    align-items: flex-start;
+    align-items: center; /* 居中对齐 */
     gap: 16px; /* 与侧边栏中的间距一致 */
-    flex-wrap: wrap;
     content-visibility: auto;
     overflow-y: auto;
     z-index: 2147483646; /* 降低z-index，确保不会覆盖tooltip和右键菜单 */
@@ -433,22 +428,26 @@
 /* 拖拽指示线样式 */
 .sidedock-drop-indicator {
     position: fixed;
-    height: 2px;
+    height: 4px; /* 进一步增加高度使其更明显 */
     background-color: #3aa6ff;
-    z-index: 2147483646;
+    z-index: 2147483649; /* 增加z-index，确保在最顶层 */
     pointer-events: none;
-    box-shadow: 0 0 4px rgba(58, 166, 255, 0.7);
+    box-shadow: 0 0 12px rgba(58, 166, 255, 1); /* 增强阴影效果 */
     transform: translateY(-50%); /* 确保指示线垂直居中 */
-    border-radius: 1px;
-    animation: glow 1.5s infinite alternate; /* 添加轻微的呼吸效果 */
+    border-radius: 2px; /* 增加圆角 */
+    animation: glow 1s infinite alternate; /* 加快动画速度 */
 }
 
 @keyframes glow {
     from {
         box-shadow: 0 0 4px rgba(58, 166, 255, 0.7);
+        opacity: 0.8;
+        transform: translateY(-50%) scaleX(0.98);
     }
     to {
-        box-shadow: 0 0 8px rgba(58, 166, 255, 0.9);
+        box-shadow: 0 0 16px rgba(58, 166, 255, 1);
+        opacity: 1;
+        transform: translateY(-50%) scaleX(1.02);
     }
 }
 
@@ -689,7 +688,7 @@
     opacity: 0;
 }
 
-/* 拖拽指示线样式已移除 */
+
 
 .loading-spinner {
     position: absolute;

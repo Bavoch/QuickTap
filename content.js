@@ -51,10 +51,10 @@ class SideDock {
         this.showSidebarDelay = 300; // 显示侧边栏的延迟时间（毫秒）
         this.lastShowTime = 0; // 上次显示侧边栏的时间戳
 
-        // Listen for changes in chrome.storage
-       this.isLoadingApps = false; // 添加标志防止重复加载
-       this.loadingTimeout = null; // 用于防止短时间内多次加载
-       this.isDragging = false; // 添加标志防止拖拽时重新加载
+        // 状态标志
+        this.isLoadingApps = false;
+        this.loadingTimeout = null;
+        this.isDragging = false;
 
         this.storageChangeHandler = (changes, namespace) => {
             try {
@@ -106,35 +106,29 @@ class SideDock {
     init() {
         // 检查是否已经初始化
         if (window.sideDockInstance) {
-            // SideDock already initialized, skipping initialization
             return window.sideDockInstance;
         }
 
-        // Initializing SideDock...
-
         // 移除可能存在的旧元素
-        // Removing existing SideDock elements...
         const existingElements = document.querySelectorAll('.sidedock-extension');
-        // Found existing elements to remove
         existingElements.forEach(element => {
             try {
                 element.remove();
             } catch (error) {
-                // Error removing element
+                // 忽略错误
             }
         });
 
         // 再次检查是否有元素没有被清除
         const remainingElements = document.querySelectorAll('.sidedock-extension');
         if (remainingElements.length > 0) {
-            // Still have remaining elements after cleanup, forcing removal
             remainingElements.forEach(element => {
                 try {
                     if (element.parentNode) {
                         element.parentNode.removeChild(element);
                     }
                 } catch (error) {
-                    // Error force removing element
+                    // 忽略错误
                 }
             });
         }
@@ -144,23 +138,13 @@ class SideDock {
         this.overlay.className = 'sidedock-overlay sidedock-extension';
         document.body.appendChild(this.overlay);
 
-        // 创建屏幕边缘触发区域（半透明白色指示条）
+        // 创建屏幕边缘触发区域
         this.triggerZone = document.createElement('div');
         this.triggerZone.className = 'sidedock-trigger-zone sidedock-extension';
-        // 初始时显示触发区域，因为侧边栏默认不显示
         this.triggerZone.style.display = 'block';
-        // 初始时将触发区域设置为闲置状态
         this.triggerZone.classList.add('idle');
         document.body.appendChild(this.triggerZone);
         this.visible = false; // 初始为不可见
-
-        // 确保触发区域初始状态正确
-        // 保持idle类，使指示条处于闲置状态
-
-        // 添加防抖动变量
-        this.showSidebarTimer = null;
-        this.showSidebarDelay = 300; // 300ms延迟，防止抖动
-        this.lastShowTime = 0; // 记录上次显示时间
 
         // 添加触发区域的鼠标进入事件（立即触发，无延迟）
         this.triggerZone.addEventListener('mouseenter', () => {
@@ -762,20 +746,237 @@ class SideDock {
         return container;
     }
 
-    // 获取拖拽目标位置的辅助方法
-    getDragAfterElement(_, y) {
-        const draggableElements = [...this.popup.querySelectorAll('.app-icon:not(.dragging)')];
+    // 获取拖拽目标位置的辅助方法 - 增强版
+    getDragAfterElement(container, y) {
+        // 检查是否是分组弹窗
+        const isGroupPopup = container.classList.contains('group-popup');
 
+        // 获取所有非拖拽中的元素
+        const selector = isGroupPopup ? '.popup-app-icon:not(.dragging)' : '.app-icon:not(.dragging)';
+        const draggableElements = [...container.querySelectorAll(selector)];
+
+        console.log('getDragAfterElement', {
+            container,
+            isGroupPopup,
+            y,
+            draggableElements,
+            selector
+        });
+
+        if (draggableElements.length === 0) {
+            console.log('没有找到可拖拽元素');
+            return null;
+        }
+
+        // 找到鼠标位置下方最近的元素
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
             const offset = y - box.top - box.height / 2;
 
+            console.log('检查元素', {
+                child,
+                box,
+                offset,
+                closestOffset: closest.offset
+            });
+
+            // 如果鼠标在元素中点上方，且比之前找到的元素更近
             if (offset < 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
                 return closest;
             }
         }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // 处理从分组弹窗拖拽到侧边栏的操作
+    async handleGroupChildDrop(groupIndex, childIndex, targetIndex) {
+        try {
+            // 获取原始应用数据
+            const originalApps = await this.getApps();
+            let newApps = [...originalApps];
+
+            // 确保分组和子应用索引有效
+            if (groupIndex >= 0 && groupIndex < newApps.length &&
+                newApps[groupIndex].children &&
+                childIndex >= 0 && childIndex < newApps[groupIndex].children.length) {
+
+                // 获取要移除的子应用
+                const child = {...newApps[groupIndex].children[childIndex]};
+
+                // 从分组中移除
+                newApps[groupIndex].children.splice(childIndex, 1);
+
+                // 如果分组只剩一个应用，自动解散分组
+                if (newApps[groupIndex].children.length === 1) {
+                    // 获取最后一个子应用
+                    const lastChild = {...newApps[groupIndex].children[0]};
+                    // 替换分组为该应用
+                    newApps[groupIndex] = lastChild;
+                }
+                // 如果分组为空，移除分组标记
+                else if (newApps[groupIndex].children.length === 0) {
+                    delete newApps[groupIndex].children;
+                    delete newApps[groupIndex].isGroup;
+                    delete newApps[groupIndex].collapsed;
+                }
+
+                // 将移除的应用添加到目标位置
+                newApps.splice(targetIndex + 1, 0, child);
+
+                // 保存更新后的应用列表
+                await this.saveApps(newApps);
+
+                // 重置拖拽状态
+                this.isDraggingFromGroupPopup = false;
+                this.draggingGroupIndex = null;
+                this.draggingChildIndex = null;
+
+                // 隐藏拖拽指示线
+                const dropIndicator = document.getElementById('sidedock-drop-indicator');
+                if (dropIndicator) {
+                    dropIndicator.style.display = 'none';
+                }
+
+                // 重新加载应用列表
+                this.loadApps();
+
+                // 隐藏分组弹窗
+                this.hideGroupPopup();
+            }
+        } catch (error) {
+            // 处理错误
+        }
+    }
+
+    // 处理添加应用到分组的操作
+    async handleAddToGroup(draggedIndex, targetIndex, apps) {
+        try {
+            // 获取拖拽的应用和目标分组
+            const draggedApp = {...apps[draggedIndex]};
+            const targetGroup = apps[targetIndex];
+
+            // 确保目标分组有children数组
+            if (!targetGroup.children) {
+                targetGroup.children = [];
+            }
+
+            // 将拖拽的应用添加到分组中
+            targetGroup.children.push(draggedApp);
+
+            // 从原位置删除拖拽的应用
+            apps.splice(draggedIndex, 1);
+
+            // 更新索引
+            if (draggedIndex < targetIndex) {
+                // 如果拖拽的应用在分组前面，需要调整分组的索引
+                apps[targetIndex - 1] = targetGroup;
+            } else {
+                apps[targetIndex] = targetGroup;
+            }
+
+            // 保存更新后的应用列表
+            await this.saveApps(apps);
+
+            // 重新加载应用列表
+            this.loadApps();
+        } catch (error) {
+            // 处理错误
+        }
+    }
+
+    // 处理创建新分组的操作
+    async handleCreateGroup(draggedIndex, targetIndex, apps) {
+        try {
+            // 获取拖拽的应用和目标应用
+            const draggedApp = {...apps[draggedIndex]};
+            const targetApp = {...apps[targetIndex]};
+
+            // 创建新分组
+            const newGroup = {
+                title: "未命名",
+                url: targetApp.url,
+                favicon: targetApp.favicon,
+                isGroup: true,
+                collapsed: false,
+                children: [targetApp, draggedApp]
+            };
+
+            // 确定需要删除的索引
+            const indicesToRemove = [draggedIndex, targetIndex].sort((a, b) => b - a);
+
+            // 从原位置删除应用（从大索引开始删除，避免索引变化）
+            indicesToRemove.forEach(index => {
+                apps.splice(index, 1);
+            });
+
+            // 在目标位置插入新分组
+            const insertIndex = Math.min(draggedIndex, targetIndex);
+            apps.splice(insertIndex, 0, newGroup);
+
+            // 保存更新后的应用列表
+            await this.saveApps(apps);
+
+            // 重新加载应用列表
+            this.loadApps();
+        } catch (error) {
+            // 处理错误
+        }
+    }
+
+    // 处理普通的拖拽排序操作
+    async handleReorder(container, originalApps) {
+        try {
+            // 获取当前DOM中的应用顺序
+            const finalAppIcons = Array.from(container.querySelectorAll('.app-icon'));
+
+            // 检查元素是否存在
+            if (!finalAppIcons.length || !originalApps.length) return;
+
+            // 创建URL -> 应用数据的映射，便于查找
+            const appDataMap = new Map();
+            originalApps.forEach(app => {
+                if (app && app.url) {
+                    appDataMap.set(app.url, app);
+                }
+            });
+
+            // 根据DOM顺序重建应用数组
+            let newApps = [];
+            let dataConsistent = true;
+
+            finalAppIcons.forEach((icon, index) => {
+                const url = icon.dataset.url;
+                if (appDataMap.has(url)) {
+                    newApps.push(appDataMap.get(url));
+                    // 更新索引以匹配新的DOM顺序
+                    icon.dataset.index = index.toString();
+                } else {
+                    dataConsistent = false;
+                }
+            });
+
+            // 检查数据一致性
+            if (!dataConsistent || newApps.length !== originalApps.length) return;
+
+            // 保存更新后的应用列表
+            await this.saveApps(newApps);
+        } catch (error) {
+            // 处理错误
+        }
+    }
+
+    // 保存应用列表的辅助方法
+    async saveApps(apps) {
+        return new Promise((resolve, reject) => {
+            chrome.storage.local.set({ apps }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
+                } else {
+                    resolve();
+                }
+            });
+        });
     }
 
     async loadApps() {
@@ -915,420 +1116,173 @@ class SideDock {
                     appIcon.classList.add('active');
                 }
 
-                // 添加拖拽事件监听器
+                // 添加拖拽事件监听器 - 简化版
                 appIcon.addEventListener('dragstart', (e) => {
                     this.isDragging = true;
-                    // e.stopPropagation(); // Might prevent some default browser drag behaviors if needed
-                    // Use element's index at drag start
                     e.dataTransfer.setData('text/plain', appIcon.dataset.index);
                     e.dataTransfer.effectAllowed = 'move';
-                    // Add delay to allow setting drag image properly
-                    setTimeout(() => {
-                        appIcon.classList.add('dragging');
-                    }, 0);
+
                     // 设置拖拽图像
                     const dragImage = document.createElement('img');
                     dragImage.src = appIcon.querySelector('img').src;
                     dragImage.style.width = '32px';
                     dragImage.style.height = '32px';
                     dragImage.style.opacity = '0.7';
-                    dragImage.style.position = 'absolute'; // Avoid affecting layout
-                    dragImage.style.left = '-9999px'; // Hide it initially
                     document.body.appendChild(dragImage);
-                    e.dataTransfer.setDragImage(dragImage, 16, 16); // Center image on cursor
-                    // Clean up drag image after setting it
-                    setTimeout(() => document.body.removeChild(dragImage), 0);
+                    e.dataTransfer.setDragImage(dragImage, 16, 16);
+
+                    // 延迟添加拖拽样式和清理拖拽图像
+                    setTimeout(() => {
+                        appIcon.classList.add('dragging');
+                        document.body.removeChild(dragImage);
+                    }, 0);
 
                     // 隐藏悬停提示
                     this.hideTooltip();
                 });
 
-                // {{edit 2: Modify dragend listener}}
-                appIcon.addEventListener('dragend', (_) => {
-                    // Use querySelector to ensure we remove class from the correct element if it exists
-                    const draggingElem = this.popup?.querySelector('.app-icon.dragging');
-                    if (draggingElem) {
-                        draggingElem.classList.remove('dragging');
-                    }
+                // 拖拽结束事件
+                appIcon.addEventListener('dragend', () => {
+                    // 清除拖拽状态
+                    this.isDragging = false;
+                    appIcon.classList.remove('dragging');
 
                     // 清除所有高亮样式
                     const allIcons = this.popup.querySelectorAll('.app-icon');
-                    allIcons.forEach(icon => {
-                        icon.classList.remove('drag-over');
-                    });
+                    allIcons.forEach(icon => icon.classList.remove('drag-over'));
 
                     // 隐藏拖拽指示线
                     const dropIndicator = document.getElementById('sidedock-drop-indicator');
                     if (dropIndicator) {
                         dropIndicator.style.display = 'none';
                     }
-
-                    // Reset isDragging flag when drag operation concludes
-                    this.isDragging = false;
-                    // Drag ended, isDragging set to false
-                    // Clear dataTransfer data (optional, good practice)
-                    // e.dataTransfer.clearData(); // This might cause issues on some browsers, test carefully
                 });
 
+                // 拖拽经过事件
                 appIcon.addEventListener('dragover', (e) => {
-                    e.preventDefault(); // Necessary to allow drop
+                    e.preventDefault();
                     e.stopPropagation();
-                    e.dataTransfer.dropEffect = 'move'; // Indicate moving is allowed
+                    e.dataTransfer.dropEffect = 'move';
 
-                    // 检查是否有从分组弹窗拖拽过来的应用
-                    const isGroupChildDrag = this.isDraggingFromGroupPopup ||
-                        e.dataTransfer.types.includes('text/plain') &&
-                        e.dataTransfer.getData('text/plain') === 'group-child-drag';
-
-                    // 获取正在拖拽的元素
+                    // 获取拖拽元素和容器
                     const draggingElement = this.popup?.querySelector('.dragging');
+                    const isGroupChildDrag = this.isDraggingFromGroupPopup;
 
-                    // 如果既不是从侧边栏拖拽也不是从分组弹窗拖拽，则退出
-                    if (!draggingElement && !isGroupChildDrag && !this.isDraggingFromGroupPopup) return;
-
-                    // 如果是从侧边栏拖拽，且拖拽到自己，则退出
-                    if (draggingElement && draggingElement === appIcon) return;
+                    // 如果没有拖拽元素或拖拽到自己，则退出
+                    if ((!draggingElement && !isGroupChildDrag) || (draggingElement === appIcon)) return;
 
                     const appListContainer = this.domElements.appList;
-                    if(!appListContainer) return;
+                    if (!appListContainer) return;
 
-                    // 获取拖拽指示线元素
+                    // 获取或创建拖拽指示线
                     let dropIndicator = document.getElementById('sidedock-drop-indicator');
                     if (!dropIndicator) {
-                        // 如果不存在，创建一个
                         dropIndicator = document.createElement('div');
                         dropIndicator.id = 'sidedock-drop-indicator';
-                        dropIndicator.className = 'drop-indicator';
+                        dropIndicator.className = 'sidedock-drop-indicator';
                         document.body.appendChild(dropIndicator);
                     }
 
-                    // 移除所有元素的高亮样式
+                    // 清除所有高亮样式
                     const allIcons = this.popup.querySelectorAll('.app-icon');
                     allIcons.forEach(icon => {
-                        if (!draggingElement || icon !== draggingElement) {
+                        if (icon !== draggingElement) {
                             icon.classList.remove('drag-over');
                         }
                     });
 
-                    // 获取目标位置
+                    // 获取目标位置和元素信息
                     const afterElement = this.getDragAfterElement(appListContainer, e.clientY);
                     const rect = appIcon.getBoundingClientRect();
                     const isTargetGroup = appIcon.dataset.isGroup === 'true';
                     const isDraggedGroup = draggingElement ? draggingElement.dataset.isGroup === 'true' : false;
 
-                    // 判断是拖拽到图标之间还是拖拽到图标上
+                    // 判断是拖拽到图标上还是图标之间
                     const mouseY = e.clientY;
                     const iconMiddle = rect.top + rect.height / 2;
-                    const isOnIcon = Math.abs(mouseY - iconMiddle) < rect.height * 0.3; // 在图标中间区域
+                    const isOnIcon = Math.abs(mouseY - iconMiddle) < rect.height * 0.3;
 
-                    // 如果拖拽到图标上，并且是拖拽到分组上或者是普通图标拖到普通图标上（创建分组）
+                    // 处理拖拽到图标上的情况（创建分组或添加到分组）
                     if (isOnIcon && ((isTargetGroup && (isGroupChildDrag || !isDraggedGroup)) ||
                                     (!isTargetGroup && !isDraggedGroup && draggingElement !== appIcon))) {
-                        // 高亮目标图标
                         appIcon.classList.add('drag-over');
-                        // 隐藏指示线
                         dropIndicator.style.display = 'none';
-                    } else {
-                        // 拖拽到图标之间，显示指示线
+                    }
+                    // 处理拖拽到图标之间的情况（排序）
+                    else {
                         if (afterElement) {
-                            // 计算指示线位置 - 精确放置在两个元素之间
+                            // 计算指示线位置
                             const afterRect = afterElement.getBoundingClientRect();
-                            const beforeElement = afterElement.previousElementSibling;
+                            dropIndicator.style.width = `${rect.width}px`;
+                            dropIndicator.style.left = `${rect.left}px`;
+                            dropIndicator.style.top = `${afterRect.top - 1}px`;
+                            dropIndicator.style.display = 'block';
 
-                            if (beforeElement && (!draggingElement || beforeElement !== draggingElement)) {
-                                // 如果有前一个元素且不是正在拖拽的元素，放在两个元素之间的中点
-                                const beforeRect = beforeElement.getBoundingClientRect();
-                                const middleY = (beforeRect.bottom + afterRect.top) / 2;
-
-                                dropIndicator.style.width = `${rect.width}px`;
-                                dropIndicator.style.left = `${rect.left}px`;
-                                dropIndicator.style.top = `${middleY}px`;
-                                dropIndicator.style.display = 'block';
-                            } else {
-                                // 如果没有前一个元素或前一个元素是正在拖拽的元素，放在afterElement上方
-                                dropIndicator.style.width = `${rect.width}px`;
-                                dropIndicator.style.left = `${rect.left}px`;
-                                dropIndicator.style.top = `${afterRect.top - 1}px`;
-                                dropIndicator.style.display = 'block';
-                            }
-
-                            // 如果是从侧边栏拖拽，则移动元素
+                            // 移动元素
                             if (draggingElement && draggingElement.nextSibling !== afterElement) {
                                 appListContainer.insertBefore(draggingElement, afterElement);
                             }
                         } else {
-                            // 如果是拖到最后，指示线放在最后一个元素下方
+                            // 拖拽到最后位置
                             const lastElement = appListContainer.lastElementChild;
-                            if (lastElement && (!draggingElement || lastElement !== draggingElement)) {
+                            if (lastElement && lastElement !== draggingElement) {
                                 const lastRect = lastElement.getBoundingClientRect();
                                 dropIndicator.style.width = `${rect.width}px`;
                                 dropIndicator.style.left = `${rect.left}px`;
-                                dropIndicator.style.top = `${lastRect.bottom + 1}px`; // 放在最后一个元素下方
+                                dropIndicator.style.top = `${lastRect.bottom + 1}px`;
                                 dropIndicator.style.display = 'block';
-                            }
 
-                            // 如果是从侧边栏拖拽，则移动元素
-                            if (draggingElement && appListContainer.lastElementChild !== draggingElement) {
-                                appListContainer.appendChild(draggingElement);
+                                // 移动元素
+                                if (draggingElement && appListContainer.lastElementChild !== draggingElement) {
+                                    appListContainer.appendChild(draggingElement);
+                                }
                             }
                         }
                     }
                 });
 
-                // 修改后的drop监听器，支持分组功能
+                // 简化版的drop事件处理函数
                 appIcon.addEventListener('drop', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
 
-                    // 检查是否有拖拽数据
-                    let dragData;
-                    try {
-                        const jsonData = e.dataTransfer.getData('application/json');
-                        if (jsonData) {
-                            dragData = JSON.parse(jsonData);
-                        }
-                    } catch (error) {
-                        // 解析JSON失败，忽略
-                    }
-
                     // 处理从分组弹窗拖拽过来的应用
-                    if ((dragData && dragData.type === 'group-child') || this.isDraggingFromGroupPopup) {
-                        // 从分组弹窗拖拽过来的应用
-                        const groupIndex = dragData ? dragData.groupIndex : this.draggingGroupIndex;
-                        const childIndex = dragData ? dragData.childIndex : this.draggingChildIndex;
-                        const targetIndex = parseInt(appIcon.dataset.index);
-
-                        // 获取原始应用数据
-                        const originalApps = await this.getApps();
-                        let newApps = [...originalApps]; // 创建副本以进行修改
-
-                        // 确保分组和子应用索引有效
-                        if (groupIndex >= 0 && groupIndex < newApps.length &&
-                            newApps[groupIndex].children &&
-                            childIndex >= 0 && childIndex < newApps[groupIndex].children.length) {
-
-                            // 获取要移除的子应用
-                            const child = {...newApps[groupIndex].children[childIndex]};
-
-                            // 从分组中移除
-                            newApps[groupIndex].children.splice(childIndex, 1);
-
-                            // 如果分组为空，移除分组标记
-                            if (newApps[groupIndex].children.length === 0) {
-                                delete newApps[groupIndex].children;
-                                delete newApps[groupIndex].isGroup;
-                                delete newApps[groupIndex].collapsed;
-                            }
-
-                            // 将移除的应用添加到目标位置
-                            newApps.splice(targetIndex + 1, 0, child);
-
-                            // 保存更新后的应用列表
-                            try {
-                                await new Promise((resolve, reject) => {
-                                    chrome.storage.local.set({ apps: newApps }, () => {
-                                        if (chrome.runtime.lastError) {
-                                            reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
-                                        } else {
-                                            resolve();
-                                        }
-                                    });
-                                });
-
-                                // 重置拖拽状态
-                                this.isDraggingFromGroupPopup = false;
-                                this.draggingGroupIndex = null;
-                                this.draggingChildIndex = null;
-
-                                // 隐藏拖拽指示线
-                                const dropIndicator = document.getElementById('sidedock-drop-indicator');
-                                if (dropIndicator) {
-                                    dropIndicator.style.display = 'none';
-                                }
-
-                                // 重新加载应用列表
-                                this.loadApps();
-
-                                // 隐藏分组弹窗
-                                this.hideGroupPopup();
-
-                                return; // 处理完成，退出函数
-                            } catch (error) {
-                                // 保存失败，继续执行
-                            }
-                        }
-                    }
-
-                    const draggedElement = this.popup?.querySelector('.dragging');
-                    // Ensure drop happens on a valid target and we were dragging something
-                    if (!draggedElement || !appIcon.classList.contains('app-icon')) {
-                        // Drop happened on invalid target or no element was being dragged
-                        // Ensure drag state is reset anyway (handled by dragend)
+                    if (this.isDraggingFromGroupPopup) {
+                        await this.handleGroupChildDrop(this.draggingGroupIndex, this.draggingChildIndex, parseInt(appIcon.dataset.index));
                         return;
                     }
 
-                    // Drop event triggered
+                    // 处理侧边栏内部拖拽
+                    const draggedElement = this.popup?.querySelector('.dragging');
+                    if (!draggedElement || !appIcon.classList.contains('app-icon')) return;
 
                     // 获取拖拽元素和目标元素的索引
                     const draggedIndex = parseInt(draggedElement.dataset.index);
                     const targetIndex = parseInt(appIcon.dataset.index);
 
                     // 如果拖拽到自己身上，不做任何处理
-                    if (draggedIndex === targetIndex) {
-                        return;
-                    }
+                    if (draggedIndex === targetIndex) return;
+
+                    // 获取原始应用数据
+                    const originalApps = await this.getApps();
+                    let newApps = [...originalApps];
 
                     // 检查是否拖拽到分组上或者是否需要创建新分组
                     const isTargetGroup = appIcon.dataset.isGroup === 'true';
                     const isDraggedGroup = draggedElement.dataset.isGroup === 'true';
 
-                    // 获取原始应用数据
-                    const originalApps = await this.getApps();
-                    let newApps = [...originalApps]; // 创建副本以进行修改
-
                     // 如果拖拽到分组上，将应用添加到分组中
                     if (isTargetGroup && !isDraggedGroup) {
-                        // Adding app to group
-
-                        // 获取拖拽的应用和目标分组
-                        const draggedApp = {...newApps[draggedIndex]};
-                        const targetGroup = newApps[targetIndex];
-
-                        // 确保目标分组有children数组
-                        if (!targetGroup.children) {
-                            targetGroup.children = [];
-                        }
-
-                        // 将拖拽的应用添加到分组中
-                        targetGroup.children.push(draggedApp);
-
-                        // 从原位置删除拖拽的应用
-                        newApps.splice(draggedIndex, 1);
-
-                        // 更新索引
-                        if (draggedIndex < targetIndex) {
-                            // 如果拖拽的应用在分组前面，需要调整分组的索引
-                            newApps[targetIndex - 1] = targetGroup;
-                        } else {
-                            newApps[targetIndex] = targetGroup;
-                        }
+                        await this.handleAddToGroup(draggedIndex, targetIndex, newApps);
                     }
                     // 如果拖拽到普通应用上，创建新分组
                     else if (!isTargetGroup && !isDraggedGroup) {
-                        // Creating new group with apps
-
-                        // 获取拖拽的应用和目标应用
-                        const draggedApp = {...newApps[draggedIndex]};
-                        const targetApp = {...newApps[targetIndex]};
-
-                        // 创建新分组
-                        const newGroup = {
-                            title: "未命名",
-                            url: targetApp.url, // 使用目标应用的URL作为分组URL
-                            favicon: targetApp.favicon, // 使用目标应用的图标作为分组图标
-                            isGroup: true,
-                            collapsed: false, // 默认展开
-                            children: [targetApp, draggedApp] // 添加目标应用和拖拽的应用到分组中
-                        };
-
-                        // 确定需要删除的索引
-                        const indicesToRemove = [draggedIndex, targetIndex].sort((a, b) => b - a);
-
-                        // 从原位置删除应用（从大索引开始删除，避免索引变化）
-                        indicesToRemove.forEach(index => {
-                            newApps.splice(index, 1);
-                        });
-
-                        // 在目标位置插入新分组
-                        const insertIndex = Math.min(draggedIndex, targetIndex);
-                        newApps.splice(insertIndex, 0, newGroup);
+                        await this.handleCreateGroup(draggedIndex, targetIndex, newApps);
                     }
                     // 如果是普通的拖拽排序
                     else {
-                        // Monkey patch chrome.runtime.sendMessage to prevent updateApps messages
-                        const originalSendMessage = chrome.runtime.sendMessage;
-                        chrome.runtime.sendMessage = function(message, callback) {
-                            if (message && message.action === 'updateApps') {
-                                // Intercepted updateApps message, preventing it from being sent
-                                if (callback) {
-                                    setTimeout(() => {
-                                        callback({ success: true, intercepted: true });
-                                    }, 0);
-                                }
-                                return;
-                            }
-                            return originalSendMessage.apply(chrome.runtime, arguments);
-                        };
-
-                        try {
-                            // 1. Get the new order based on the current DOM structure
-                            const finalAppIcons = Array.from(this.domElements.appList.querySelectorAll('.app-icon'));
-
-                            // Check if elements exist before proceeding
-                            if (!finalAppIcons.length || !originalApps.length) {
-                                // Could not get final icons or original apps data during drop
-                                return;
-                            }
-
-                            // Create a map of URL -> app data for efficient lookup
-                            const appDataMap = new Map();
-                            originalApps.forEach(app => {
-                                if (app && app.url) {
-                                    appDataMap.set(app.url, app);
-                                } else {
-                                    // Found app with missing URL in originalApps during drop mapping
-                                }
-                            });
-
-                            newApps = [];
-                            let dataConsistent = true;
-
-                            // 2. Rebuild the apps array and update data-index attributes immediately
-                            finalAppIcons.forEach((icon, index) => {
-                                const url = icon.dataset.url;
-                                if (appDataMap.has(url)) {
-                                    newApps.push(appDataMap.get(url));
-                                    // Update data-index immediately to match new DOM order
-                                    icon.dataset.index = index.toString();
-                                } else {
-                                    // Data inconsistency: Could not find app data for URL during reorder
-                                    dataConsistent = false;
-                                }
-                            });
-
-                            // 3. Check for consistency before saving
-                            if (!dataConsistent || newApps.length !== originalApps.length) {
-                                // App order inconsistency detected! Aborting save
-                                return; // Prevent saving inconsistent data
-                            }
-                        } catch (error) {
-                            // Error processing drop event
-                        } finally {
-                            // 恢复原始的chrome.runtime.sendMessage函数
-                            setTimeout(() => {
-                                chrome.runtime.sendMessage = originalSendMessage;
-                                // Restored original chrome.runtime.sendMessage
-                            }, 1000);
-                        }
+                        await this.handleReorder(this.domElements.appList, originalApps);
                     }
-
-                    // 保存更新后的应用列表
-                    try {
-                        await new Promise((resolve, reject) => {
-                            chrome.storage.local.set({ apps: newApps }, () => {
-                                if (chrome.runtime.lastError) {
-                                    // Error saving apps after drop
-                                    reject(new Error(chrome.runtime.lastError.message || 'Error saving apps'));
-                                } else {
-                                    // Apps saved successfully after drop
-                                    resolve();
-                                }
-                            });
-                        });
-                    } catch (storageError) {
-                        // Error saving app order to storage
-                    }
-                    // 'isDragging' and '.dragging' class are reset in 'dragend' which always fires after 'drop'
                 });
 
                 // 添加悬停事件处理
@@ -1659,15 +1613,7 @@ class SideDock {
             apps.splice(this.currentAppIndex, 0, ...group.children);
 
             // 保存更新后的应用列表
-            await new Promise((resolve, reject) => {
-                chrome.storage.local.set({ apps }, () => {
-                    if (chrome.runtime.lastError) {
-                        reject(new Error(chrome.runtime.lastError.message));
-                        return;
-                    }
-                    resolve();
-                });
-            });
+            await this.saveApps(apps);
 
             // 隐藏分组弹窗（如果存在）
             this.hideGroupPopup();
@@ -1677,7 +1623,7 @@ class SideDock {
         }
     }
 
-    // 显示分组弹窗
+    // 显示分组弹窗 - 简化版
     showGroupPopup(groupIcon, children) {
         // 隐藏已存在的弹窗
         this.hideGroupPopup();
@@ -1699,30 +1645,28 @@ class SideDock {
         children.forEach((child, i) => {
             const appIcon = document.createElement('div');
             appIcon.className = 'popup-app-icon';
-            // 禁用浏览器自带的悬停提示
             appIcon.removeAttribute('title');
-            appIcon.dataset.title = child.title; // 使用自定义属性存储标题
+            appIcon.dataset.title = child.title;
             appIcon.dataset.url = child.url;
             appIcon.dataset.groupIndex = groupIndex;
             appIcon.dataset.childIndex = i;
-            appIcon.draggable = true; // 启用拖拽
+            appIcon.draggable = true;
 
             // 添加活跃指示器
             const activeIndicator = document.createElement('div');
             activeIndicator.className = 'active-indicator';
             appIcon.appendChild(activeIndicator);
 
+            // 添加图标
             const img = document.createElement('img');
             img.alt = child.title;
             img.src = child.favicon;
             img.addEventListener('error', () => {
-                // 如果图标加载失败，使用默认图标
                 img.src = this.generateDefaultIcon(child.title);
             });
-
             appIcon.appendChild(img);
 
-            // 添加点击事件
+            // 添加点击事件 - 打开应用
             appIcon.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
@@ -1747,14 +1691,8 @@ class SideDock {
                 this.draggingGroupIndex = groupIndex;
                 this.draggingChildIndex = i;
 
-                // 设置拖拽数据：分组索引和子应用索引
-                const dragData = JSON.stringify({
-                    type: 'group-child',
-                    groupIndex: groupIndex,
-                    childIndex: i
-                });
-                e.dataTransfer.setData('application/json', dragData);
-                e.dataTransfer.setData('text/plain', 'group-child-drag'); // 添加一个简单的标识，便于检测
+                // 设置拖拽数据
+                e.dataTransfer.setData('text/plain', 'group-child-drag');
                 e.dataTransfer.effectAllowed = 'move';
 
                 // 设置拖拽图像
@@ -1763,24 +1701,27 @@ class SideDock {
                 dragImage.style.width = '32px';
                 dragImage.style.height = '32px';
                 dragImage.style.opacity = '0.7';
-                dragImage.style.position = 'absolute';
-                dragImage.style.left = '-9999px';
                 document.body.appendChild(dragImage);
                 e.dataTransfer.setDragImage(dragImage, 16, 16);
 
-                // 延迟移除拖拽图像
+                // 延迟添加拖拽样式和清理拖拽图像
                 setTimeout(() => {
-                    document.body.removeChild(dragImage);
                     appIcon.classList.add('dragging');
+                    document.body.removeChild(dragImage);
 
                     // 确保拖拽指示线存在
                     let dropIndicator = document.getElementById('sidedock-drop-indicator');
                     if (!dropIndicator) {
                         dropIndicator = document.createElement('div');
                         dropIndicator.id = 'sidedock-drop-indicator';
-                        dropIndicator.className = 'drop-indicator';
+                        dropIndicator.className = 'sidedock-drop-indicator';
                         document.body.appendChild(dropIndicator);
                     }
+
+                    // 初始化拖拽指示线样式
+                    dropIndicator.style.display = 'none'; // 先隐藏，等拖拽到有效位置再显示
+                    dropIndicator.style.width = '48px'; // 设置初始宽度
+                    dropIndicator.style.zIndex = '2147483649'; // 确保z-index足够高
                 }, 0);
 
                 // 隐藏悬停提示
@@ -1791,22 +1732,80 @@ class SideDock {
             appIcon.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                e.dataTransfer.dropEffect = 'move';
+                // 确保dataTransfer存在
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = 'move';
+                }
 
-                const draggingElement = document.querySelector('.dragging');
-                // 确保有拖拽元素且不是自己
+                // 获取正在拖拽的元素
+                const draggingElement = popup.querySelector('.dragging');
                 if (!draggingElement || draggingElement === appIcon) return;
 
-                // 移除所有元素的高亮样式
-                const allIcons = document.querySelectorAll('.popup-app-icon');
-                allIcons.forEach(icon => {
-                    if (icon !== draggingElement) {
-                        icon.classList.remove('drag-over');
-                    }
+                console.log('分组弹窗拖拽经过事件', {
+                    draggingElement,
+                    clientY: e.clientY,
+                    popup
                 });
 
-                // 高亮当前图标
-                appIcon.classList.add('drag-over');
+                // 获取或创建拖拽指示线
+                let dropIndicator = document.getElementById('sidedock-drop-indicator');
+                if (!dropIndicator) {
+                    dropIndicator = document.createElement('div');
+                    dropIndicator.id = 'sidedock-drop-indicator';
+                    dropIndicator.className = 'sidedock-drop-indicator';
+                    document.body.appendChild(dropIndicator);
+                }
+
+                // 获取目标位置和显示指示线
+                const afterElement = this.getDragAfterElement(popup, e.clientY);
+
+                if (afterElement) {
+                    // 显示指示线在目标元素上方
+                    const afterRect = afterElement.getBoundingClientRect();
+                    // 设置指示线宽度为弹窗内容宽度
+                    dropIndicator.style.width = `48px`; // 增加宽度使其更明显
+                    // 居中显示指示线
+                    const popupRect = popup.getBoundingClientRect();
+                    dropIndicator.style.left = `${popupRect.left + (popupRect.width - 48) / 2}px`; // 居中显示
+                    dropIndicator.style.top = `${afterRect.top}px`; // 调整位置
+                    dropIndicator.style.display = 'block';
+
+                    // 添加调试信息
+                    console.log('显示指示线在元素上方', {
+                        afterRect,
+                        popupRect,
+                        left: `${popupRect.left + (popupRect.width - 48) / 2}px`,
+                        top: `${afterRect.top}px`
+                    });
+
+                    // 移动元素
+                    if (draggingElement.nextSibling !== afterElement) {
+                        popup.insertBefore(draggingElement, afterElement);
+                    }
+                } else {
+                    // 显示指示线在最后一个元素下方
+                    const lastRect = popup.lastElementChild.getBoundingClientRect();
+                    // 设置指示线宽度为弹窗内容宽度
+                    dropIndicator.style.width = `48px`; // 增加宽度使其更明显
+                    // 居中显示指示线
+                    const popupRect = popup.getBoundingClientRect();
+                    dropIndicator.style.left = `${popupRect.left + (popupRect.width - 48) / 2}px`; // 居中显示
+                    dropIndicator.style.top = `${lastRect.bottom}px`; // 调整位置
+                    dropIndicator.style.display = 'block';
+
+                    // 添加调试信息
+                    console.log('显示指示线在最后元素下方', {
+                        lastRect,
+                        popupRect,
+                        left: `${popupRect.left + (popupRect.width - 48) / 2}px`,
+                        top: `${lastRect.bottom}px`
+                    });
+
+                    // 移动元素
+                    if (popup.lastElementChild !== draggingElement) {
+                        popup.appendChild(draggingElement);
+                    }
+                }
             });
 
             // 添加拖拽结束事件
@@ -1817,23 +1816,45 @@ class SideDock {
                 this.draggingChildIndex = null;
                 appIcon.classList.remove('dragging');
 
-                // 清除所有高亮样式
-                const allIcons = document.querySelectorAll('.popup-app-icon');
-                allIcons.forEach(icon => {
-                    icon.classList.remove('drag-over');
-                });
-
-                // 清除主侧边栏中的高亮样式
-                const sidebarIcons = this.popup.querySelectorAll('.app-icon');
-                sidebarIcons.forEach(icon => {
-                    icon.classList.remove('drag-over');
-                });
-
                 // 隐藏拖拽指示线
                 const dropIndicator = document.getElementById('sidedock-drop-indicator');
                 if (dropIndicator) {
                     dropIndicator.style.display = 'none';
                 }
+            });
+
+            // 添加拖拽放置事件
+            appIcon.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // 获取正在拖拽的元素
+                const draggingElement = popup.querySelector('.dragging');
+                if (!draggingElement || !appIcon.classList.contains('popup-app-icon')) return;
+
+                // 获取原始应用数据
+                const apps = await this.getApps();
+                const group = apps[groupIndex];
+
+                // 确保是分组且有子应用
+                if (!group || !group.isGroup || !group.children) return;
+
+                // 获取所有子应用的新顺序
+                const newChildren = Array.from(popup.querySelectorAll('.popup-app-icon')).map(icon => {
+                    const childIndex = parseInt(icon.dataset.childIndex);
+                    return group.children[childIndex];
+                });
+
+                // 更新分组的子应用顺序
+                group.children = newChildren;
+
+                // 保存更新后的应用列表
+                await this.saveApps(apps);
+
+                // 更新子应用索引
+                Array.from(popup.querySelectorAll('.popup-app-icon')).forEach((icon, index) => {
+                    icon.dataset.childIndex = index;
+                });
             });
 
             // 添加右键菜单事件
@@ -1843,7 +1864,7 @@ class SideDock {
                 this.showPopupAppContextMenu(e, groupIndex, i);
             });
 
-            // 添加悬停事件处理
+            // 添加悬停事件
             appIcon.addEventListener('mouseenter', (e) => {
                 this.showTooltip(e.currentTarget);
             });
@@ -1855,14 +1876,16 @@ class SideDock {
             popup.appendChild(appIcon);
         });
 
-        // 计算弹窗位置，与分组图标垂直居中对齐，间距12px
-        const popupLeft = rect.right + 12; // 分组图标右侧 + 12px间距
-        const popupTop = rect.top + (rect.height / 2) - 68; // 垂直居中（弹窗高度为136px）
+        // 计算弹窗位置，与分组图标垂直居中对齐，间距8px
+        const popupLeft = rect.right + 8;
+        // 计算弹窗高度，每个图标40px + 间距16px，最后一个图标没有间距
+        const popupHeight = Math.min(children.length * 40 + (children.length - 1) * 16 + 24, 300); // 24px为上下padding
+        const popupTop = rect.top + (rect.height / 2) - (popupHeight / 2);
 
         // 设置弹窗位置
         popup.style.left = `${popupLeft}px`;
         popup.style.top = `${popupTop}px`;
-        popup.style.zIndex = '2147483646'; // 确保z-index保持一致
+        popup.style.zIndex = '2147483646';
 
         // 添加到文档
         document.body.appendChild(popup);
@@ -2270,15 +2293,7 @@ class SideDock {
             }
 
             // 保存更改
-            await new Promise((resolve, reject) => {
-                chrome.storage.local.set({ apps }, () => {
-                    if (chrome.runtime.lastError) {
-                        reject(new Error(chrome.runtime.lastError.message));
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+            await this.saveApps(apps);
 
             // 隐藏分组弹窗
             this.hideGroupPopup();
@@ -2380,17 +2395,7 @@ class SideDock {
             apps.splice(groupIndex + 1, 0, child);
 
             // 保存更改
-            await new Promise((resolve, reject) => {
-                chrome.storage.local.set({ apps }, () => {
-                    if (chrome.runtime.lastError) {
-                        // Error removing from group
-                        reject(new Error(chrome.runtime.lastError.message));
-                    } else {
-                        // App removed from group successfully
-                        resolve();
-                    }
-                });
-            });
+            await this.saveApps(apps);
 
             // 重新加载应用列表
             this.loadApps();
@@ -2423,17 +2428,7 @@ class SideDock {
             apps.splice(this.currentAppIndex, 0, ...children);
 
             // 保存更改
-            await new Promise((resolve, reject) => {
-                chrome.storage.local.set({ apps }, () => {
-                    if (chrome.runtime.lastError) {
-                        // Error ungrouping
-                        reject(new Error(chrome.runtime.lastError.message));
-                    } else {
-                        // Group disbanded successfully
-                        resolve();
-                    }
-                });
-            });
+            await this.saveApps(apps);
 
             // 隐藏上下文菜单
             this.hideContextMenu();
@@ -2644,21 +2639,7 @@ class SideDock {
                     // App deleted
 
                     // 保存更新后的应用列表
-                    await new Promise((resolve, reject) => {
-                        try {
-                            chrome.storage.local.set({ apps }, () => {
-                                if (chrome.runtime.lastError) {
-                                    // Error saving apps after delete
-                                    reject(new Error(chrome.runtime.lastError.message));
-                                    return;
-                                }
-                                resolve();
-                            });
-                        } catch (error) {
-                            // Error in chrome.storage.local.set during delete
-                            reject(error);
-                        }
-                    });
+                    await this.saveApps(apps);
 
                     // Apps saved successfully after delete
 
@@ -2810,21 +2791,7 @@ class SideDock {
                 }
 
                 // 保存更新后的应用列表
-                await new Promise((resolve, reject) => {
-                    try {
-                        chrome.storage.local.set({ apps }, () => {
-                            if (chrome.runtime.lastError) {
-                                // Error saving apps
-                                reject(new Error(chrome.runtime.lastError.message));
-                                return;
-                            }
-                            resolve();
-                        });
-                    } catch (error) {
-                        // Error in chrome.storage.local.set
-                        reject(error);
-                    }
-                });
+                await this.saveApps(apps);
 
                 // Apps saved successfully
 
@@ -2901,22 +2868,7 @@ class SideDock {
                     if (Array.isArray(apps) && index >= 0 && index < apps.length) {
                         apps[index].favicon = defaultIcon;
 
-                        await new Promise((resolve, reject) => {
-                            try {
-                                chrome.storage.local.set({ apps }, () => {
-                                    if (chrome.runtime.lastError) {
-                                        // Error saving default icon
-                                        reject(new Error(chrome.runtime.lastError.message));
-                                        return;
-                                    }
-                                    // Default icon saved successfully
-                                    resolve();
-                                });
-                            } catch (storageError) {
-                                // Error in chrome.storage.local.set during icon error handling
-                                reject(storageError);
-                            }
-                        });
+                        await this.saveApps(apps);
                     } else {
                         // Invalid app index, cannot save default icon
                     }
@@ -3193,16 +3145,6 @@ class SideDock {
         });
     }
 
-    // handleSearch 方法已移除，因为我们已经移除了搜索框
-
-    // translate 方法已移除，因为我们已经移除了搜索框和翻译功能
-
-    updateLoadingPosition() {
-        // 不再需要动态计算加载动画的位置，因为我们已经在CSS中设置了固定位置
-        // 保留这个方法以保持兼容性
-        return;
-    }
-
     async handleAddApp() {
         try {
             // Adding new app...
@@ -3291,21 +3233,7 @@ class SideDock {
                 // Saving app to storage
 
                 // 保存到存储
-                await new Promise((resolve, reject) => {
-                    try {
-                        chrome.storage.local.set({ apps }, () => {
-                            if (chrome.runtime.lastError) {
-                                // Error saving app
-                                reject(new Error(chrome.runtime.lastError.message));
-                                return;
-                            }
-                            resolve();
-                        });
-                    } catch (error) {
-                        // Error in chrome.storage.local.set during add
-                        reject(error);
-                    }
-                });
+                await this.saveApps(apps);
 
                 // App saved, reloading app list...
 
@@ -3318,10 +3246,6 @@ class SideDock {
             // Error adding app
         }
     }
-
-    // 已合并到 getFaviconFromUrl 方法中
-
-    // 这些方法已在类中其他位置定义，此处删除重复定义
 
     // 高亮显示已添加的应用图标
     highlightDuplicateApp(index) {
@@ -3352,11 +3276,9 @@ class SideDock {
                 targetIcon.classList.remove('duplicate-highlight');
             }, 2500); // 与动画时间匹配（0.8s * 3 = 2.4s）
         } catch (error) {
-            // Error highlighting duplicate app
+            // 忽略错误
         }
     }
-
-    // 侧边栏自动隐藏实现 - 已移至上方的show()方法
 
     hide() {
         // hide() called
